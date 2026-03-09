@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tzadik Gate</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        canvas { display: block; }
+
+        /* Loading overlay */
+        #loading-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: radial-gradient(ellipse at center, #1a1020 0%, #0a0510 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        #loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+        #loading-title {
+            font-size: 2.5rem; color: #f5d78e; font-weight: 300;
+            letter-spacing: 0.3em; margin-bottom: 1.5rem;
+            text-shadow: 0 0 30px rgba(245, 215, 142, 0.4);
+        }
+        #loading-bar-outer {
+            width: 300px; height: 4px; background: rgba(255,255,255,0.1);
+            border-radius: 2px; overflow: hidden;
+        }
+        #loading-bar-inner {
+            width: 0%; height: 100%; background: linear-gradient(90deg, #f5d78e, #e8a94e);
+            border-radius: 2px; transition: width 0.3s ease;
+        }
+        #loading-status {
+            color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 0.8rem;
+            letter-spacing: 0.1em;
+        }
+
+        /* Warm dark glass theme for dropdowns */
+        .hol-select {
+            position: fixed; z-index: 10;
+            appearance: none; -webkit-appearance: none;
+            background: rgba(20, 12, 8, 0.75);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(245, 215, 142, 0.25);
+            border-radius: 8px; padding: 10px 36px 10px 14px;
+            color: #f5d78e; font-size: 0.9rem; font-family: inherit;
+            cursor: pointer; min-width: 200px;
+            outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f5d78e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        .hol-select:hover { border-color: rgba(245, 215, 142, 0.5); box-shadow: 0 0 20px rgba(245, 215, 142, 0.1); }
+        .hol-select:focus { border-color: rgba(245, 215, 142, 0.6); box-shadow: 0 0 25px rgba(245, 215, 142, 0.15); }
+        .hol-select option { background: #1a0f08; color: #f5d78e; padding: 6px; }
+
+        .select-label {
+            position: fixed; z-index: 10;
+            color: rgba(245, 215, 142, 0.5); font-size: 0.65rem;
+            letter-spacing: 0.15em; text-transform: uppercase;
+        }
+
+        #character-select { left: 24%; top: 50%; transform: translateY(-50%); }
+        #character-label { left: 24%; top: calc(50% - 26px); transform: translateY(-50%); }
+
+        #background-select { right: 28%; top: 50%; transform: translateY(-50%); }
+        #background-label { right: 28%; top: calc(50% - 26px); transform: translateY(-50%); text-align: right; }
+
+        /* Enter button hitbox — invisible overlay, tracks 3D button screen position */
+        #enter-hitbox {
+            position: fixed; z-index: 10;
+            cursor: pointer; pointer-events: auto;
+            width: 260px; height: 90px;
+            transform: translate(-50%, -50%);
+        }
+        /* ─── Tuning panel ─── */
+        #tune-toggle {
+            position: fixed; top: 10px; right: 10px; z-index: 99999;
+            background: #dc2626; color: #fff; border: 2px solid #fff;
+            padding: 8px 16px; border-radius: 4px; font-size: 14px;
+            font-weight: bold; cursor: pointer; font-family: inherit;
+        }
+        #tune-toggle:hover { background: #b91c1c; }
+        #tune-panel {
+            position: fixed; top: 50px; right: 10px; bottom: 10px;
+            z-index: 99998; width: 320px; overflow-y: auto;
+            background: rgba(17, 24, 39, 0.95); color: #e5e7eb;
+            border: 1px solid #374151; border-radius: 8px;
+            padding: 12px; font-size: 12px;
+            scrollbar-width: thin; scrollbar-color: #4b5563 transparent;
+        }
+        #tune-panel::-webkit-scrollbar { width: 6px; }
+        #tune-panel::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        #tune-panel details { margin-bottom: 10px; }
+        #tune-panel summary {
+            font-size: 13px; font-weight: bold; cursor: pointer;
+            margin-bottom: 6px; user-select: none;
+        }
+        .tune-section-content { padding-left: 4px; }
+        .tune-row {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 4px;
+        }
+        .tune-label {
+            width: 52px; flex-shrink: 0; color: #9ca3af;
+            font-size: 11px; text-align: right;
+        }
+        .tune-slider {
+            flex: 1; height: 4px; accent-color: #3b82f6;
+            cursor: pointer; background: #374151; border-radius: 2px;
+        }
+        .tune-val {
+            width: 52px; flex-shrink: 0; text-align: right;
+            font-family: monospace; font-size: 11px; color: #d1d5db;
+        }
+        .tune-select {
+            flex: 1; background: #1f2937; color: #e5e7eb;
+            border: 1px solid #4b5563; border-radius: 4px;
+            padding: 4px 6px; font-size: 11px; font-family: inherit;
+            cursor: pointer; outline: none;
+        }
+        .tune-select:focus { border-color: #3b82f6; }
+        .tune-copy-btn {
+            display: block; width: 100%; margin-top: 12px;
+            padding: 8px; background: #2563eb; color: #fff;
+            border: none; border-radius: 4px; font-size: 12px;
+            font-weight: bold; cursor: pointer; font-family: inherit;
+        }
+        .tune-copy-btn:hover { background: #1d4ed8; }
+        .tune-nudge {
+            width: 20px; height: 20px; flex-shrink: 0;
+            background: #374151; color: #d1d5db; border: 1px solid #4b5563;
+            border-radius: 3px; font-size: 13px; font-weight: bold;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            padding: 0; line-height: 1; font-family: monospace;
+        }
+        .tune-nudge:hover { background: #4b5563; color: #fff; }
+        .tune-nudge:active { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <!-- Loading screen -->
+    <div id="loading-overlay">
+        <div id="loading-title">BEITOHR</div>
+        <div id="loading-bar-outer"><div id="loading-bar-inner"></div></div>
+        <div id="loading-status">Initializing...</div>
+    </div>
+
+    <!-- Character select (left) -->
+    <span id="character-label" class="select-label">Choose Your Guide</span>
+    <select id="character-select" class="hol-select">
+        <option value="">Select Tzadik...</option>
+        <optgroup label="Tzadikim">
+            <option value="moshe_rabbeinu">Moshe Rabbeinu</option>
+            <option value="alter_rebbe">Alter Rebbe</option>
+            <option value="baal_shem_tov">Baal Shem Tov</option>
+            <option value="maimonides">Maimonides (Rambam)</option>
+            <option value="rashbi">Rashbi</option>
+            <option value="rabbi_akiva">Rabbi Akiva</option>
+            <option value="king_david">King David</option>
+            <option value="rashi">Rashi</option>
+            <option value="ramban">Ramban</option>
+            <option value="ramchal">Ramchal</option>
+            <option value="maharal">Maharal</option>
+        </optgroup>
+        <optgroup label="Matriarchs">
+            <option value="sarah_imeinu">Sarah Imeinu</option>
+            <option value="rivkah_imeinu">Rivkah Imeinu</option>
+            <option value="rachel_imeinu">Rachel Imeinu</option>
+            <option value="leah_imeinu">Leah Imeinu</option>
+            <option value="miriam_haneviah">Miriam HaNeviah</option>
+        </optgroup>
+    </select>
+
+    <!-- Background select (right) -->
+    <span id="background-label" class="select-label">Choose Background</span>
+    <select id="background-select" class="hol-select">
+        <option value="">Select Background...</option>
+        <option value="mount_sinai">Mount Sinai</option>
+        <option value="synagogue">Synagogue</option>
+        <option value="forest">Forest</option>
+        <option value="egypt">Egypt</option>
+        <option value="cave">Cave</option>
+        <option value="ancient_city">Ancient City</option>
+        <option value="desert_tents">Desert Tents</option>
+        <option value="jerusalem">Jerusalem</option>
+        <option value="beach">Beach</option>
+        <option value="western_wall">Western Wall</option>
+        <option value="study_benches">Study Benches</option>
+        <option value="library">Library</option>
+        <option value="grand_library">Grand Library</option>
+        <option value="city_square">City Square (Night)</option>
+        <option value="pyramids">Pyramids</option>
+        <option value="sky">Open Sky</option>
+        <option value="shacharit">Jerusalem Sunrise</option>
+        <option value="mincha">Synagogue (Day)</option>
+        <option value="maariv">Old City Evening</option>
+        <option value="benching">Kitchen</option>
+        <option value="karaoke">Concert Hall</option>
+        <option value="stories">Courtyard Firepit</option>
+    </select>
+
+    <!-- Enter button hitbox (positioned by JS each frame) -->
+    <div id="enter-hitbox"></div>
+
+    <!-- Tuning panel -->
+    <button id="tune-toggle">Tune</button>
+    <div id="tune-panel" style="display:none;"></div>
+
+    <div id="canvas-container"></div>
+
+    <!-- Three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // ============ CONFIGURATION (v10 baked) ============
+
+        // All BeitOhr character models (viseme GLBs)
+        const CHARACTER_MODELS = {
+            moshe_rabbeinu: '../../WS/TzadikAssets/models/finished/moshe_viseme.glb',
+            alter_rebbe: '../../WS/TzadikAssets/models/finished/alter_rebbe_viseme.glb',
+            baal_shem_tov: '../../WS/TzadikAssets/models/finished/baal_shem_tov_viseme.glb',
+            maimonides: '../../WS/TzadikAssets/models/finished/maimonides_viseme.glb',
+            rashbi: '../../WS/TzadikAssets/models/finished/rashbi_viseme.glb',
+            rabbi_akiva: '../../WS/TzadikAssets/models/finished/rabbi_akiva_viseme.glb',
+            king_david: '../../WS/TzadikAssets/models/finished/king_david_viseme.glb',
+            rashi: '../../WS/TzadikAssets/models/finished/rashi_viseme.glb',
+            ramban: '../../WS/TzadikAssets/models/finished/ramban_viseme.glb',
+            ramchal: '../../WS/TzadikAssets/models/finished/ramchal_viseme.glb',
+            maharal: '../../WS/TzadikAssets/models/finished/maharal_viseme.glb',
+            sarah_imeinu: '../../WS/TzadikAssets/models/finished/sarah_viseme.glb',
+            rivkah_imeinu: '../../WS/TzadikAssets/models/finished/rivkah_viseme.glb',
+            rachel_imeinu: '../../WS/TzadikAssets/models/finished/rachel_viseme.glb',
+            leah_imeinu: '../../WS/TzadikAssets/models/finished/leah_viseme.glb',
+            miriam_haneviah: '../../WS/TzadikAssets/models/finished/miriam_viseme.glb',
+        };
+
+        // Scene objects (logo, shields, house_of_light, torah)
+        const SCENE_OBJECTS = {
+            bo_logo_v4: '../../WS/TzadikAssets/models/Meshy_AI_logo_0222023915_texture.glb',
+            bo_logo_tzadik: '../../WS/TzadikAssets/models/Meshy_AI_TZADIK_AI_Logo_0226004746_texture.glb',
+            bo_david_star_shield: '../../WS/TzadikAssets/models/Meshy_AI_David_Star_Shield_0220192652_texture.glb',
+            bo_house_of_light: '../../WS/TzadikAssets/models/Meshy_AI_House_of_Light_0222013802_texture.glb',
+            bo_torah: '../../WS/TzadikAssets/models/torah.glb',
+        };
+
+        // Panorama
+        const PANORAMA_PATH = '../panoramas/space.jpg';
+
+        // Scene characters (v10 positions — modelKey maps to CHARACTER_MODELS)
+        const SCENE_CHARACTERS = [
+            { modelKey: 'rivkah_imeinu', x: 73.4, y: 18.5, z: 5.5, rotX: 0, rotY: 2.25, rotZ: 0, scale: 25.5 },
+            { modelKey: 'alter_rebbe', x: 40.9, y: -2.1, z: 78, rotX: 0.16, rotY: 2.05, rotZ: 0, scale: 12.6 },
+            { modelKey: 'miriam_haneviah', x: 73.6, y: 19.1, z: 35, rotX: 0, rotY: 0.92, rotZ: 0, scale: 30 },
+            { modelKey: 'baal_shem_tov', x: -5.5, y: 16.2, z: -29.2, rotX: -0.03, rotY: -3.11, rotZ: 0.15, scale: 27.1 },
+            { modelKey: 'moshe_rabbeinu', x: 28.6, y: -4, z: 84.8, rotX: -0.03, rotY: -0.86, rotZ: -0.12, scale: 14.1 },
+            { modelKey: 'king_david', x: -36.4, y: 19.3, z: -20.9, rotX: -0.09, rotY: -2.71, rotZ: 0.06, scale: 25.6 },
+            { modelKey: 'rachel_imeinu', x: -49.7, y: 7.2, z: 71.1, rotX: 0, rotY: -0.53, rotZ: 0.01, scale: 13.1 },
+            { modelKey: 'maimonides', x: -56.6, y: 9.5, z: 59.7, rotX: -0.07, rotY: -1.88, rotZ: 0, scale: 18.6 },
+        ];
+
+        // Scene objects layout (v10)
+        // house_of_light is the orbit center — loaded first so others can reference it
+        const HOUSE_OF_LIGHT = { objectKey: 'bo_house_of_light', x: 11.8, y: 2.6, z: 32.3, rotX: -0.03, rotY: -1.07, rotZ: -0.05, scale: 62.6 };
+
+        const SCENE_OBJECTS_LAYOUT = [
+            HOUSE_OF_LIGHT,
+            { objectKey: 'bo_david_star_shield', x: 68.8, y: -8.7, z: 19.1, rotX: -1.55, rotY: 0.02, rotZ: 1.35, scale: 28.5 },
+            { objectKey: 'bo_david_star_shield', x: -49.7, y: -11, z: 64.3, rotX: -1.93, rotY: -0.03, rotZ: -2, scale: 19.5 },
+            { objectKey: 'bo_david_star_shield', x: -24, y: -13.3, z: -29.2, rotX: -1.6, rotY: 0.19, rotZ: -2.75, scale: 32 },
+            { objectKey: 'bo_david_star_shield', x: 31.7, y: -17.8, z: 81.1, rotX: -1.74, rotY: -0.23, rotZ: -1.64, scale: 17.1 },
+        ];
+
+        // Orbit center (house_of_light position)
+        const ORBIT_CENTER = { x: HOUSE_OF_LIGHT.x, y: HOUSE_OF_LIGHT.y, z: HOUSE_OF_LIGHT.z };
+
+        // Logo orbit config (v10)
+        const LOGO_CONFIG = {
+            objectKey: 'bo_logo_tzadik', y: 71.4, scale: 32.6,
+            orbitSpeed: 0.14, orbitRadius: 40,
+            rotX: -0.09, rotZ: 0.06
+        };
+
+        // Torah config (v10 — diagonal spin)
+        const TORAH_CONFIG = {
+            objectKey: 'bo_torah',
+            x: 22.4, y: 68.8, z: 37.8,
+            rotX: 0.21, rotY: -0.42, rotZ: -1.7,
+            scale: 14.1, scaleW: 1.6, scaleH: 1.85,
+            diagonalSpin: { speed: 0.4, axisX: 0.3, axisY: 1.0, axisZ: 0.2 }
+        };
+
+        // Enter button config (v10 — buttonConfig + orbit)
+        const ENTER_BUTTON_CONFIG = {
+            orbitSpeed: -0.12, orbitRadius: 97,
+            buttonConfig: {
+                locked: {
+                    faceBg: 'rgba(245, 236, 0, 1)',
+                    borderColor: 'rgba(245, 215, 142, 0.2)',
+                    borderWidth: 3,
+                    iconColor: 'rgba(17, 5, 59, 1)',
+                    textColor: 'rgba(17, 5, 59, 1)',
+                    text: 'SELECT TO ENTER',
+                    textSize: 32,
+                    faceOpacity: 0.4,
+                    rimOpacity: 0.6
+                },
+                unlocked: {
+                    faceBg: 'rgba(44, 19, 118, 0.75)',
+                    borderColor: '#f5d78e',
+                    borderWidth: 6,
+                    highlightColor: 'rgba(255, 240, 200, 0.3)',
+                    iconColor: '#f5d78e',
+                    iconGlow: '#e8a94e',
+                    iconGlowBlur: 10,
+                    textColor: '#f5ec00',
+                    textGlow: '#c4bc00',
+                    text: 'ENTER',
+                    textSize: 52,
+                    faceOpacity: 1.0,
+                    rimOpacity: 0.9
+                },
+                rimColor: '#001e57',
+                edgeColor: '#0056d6',
+                edgeOpacity: 1.0
+            }
+        };
+
+        // Sun (v10)
+        const SUN_CONFIG = {
+            distance: 38, elevation: -0.03, azimuth: -0.13, intensity: 23,
+            radius: 13.6, glowScale: 30, color: '#ffffff', glowColor: '#f5ec00'
+        };
+
+        // Post-processing (v10)
+        const BLOOM_CONFIG = { strength: 1.5, threshold: 0.92, radius: 0.4 };
+
+        // Camera (v10)
+        const CAMERA_CONFIG = { fov: 137, minDistance: 69, maxDistance: 100, height: 35.7, targetX: 0.4, targetY: 29.3, targetZ: 9.5, autoRotateSpeed: 0 };
+
+        const SPHERE_RADIUS = 150;
+
+        // ============ GLOBALS ============
+        let scene, camera, renderer, controls, composer, bloomPass;
+        let panoramaSphere, panoramaMaterial;
+        let enterButtonGroup, enterButton3D;
+        let logoMesh, torahMesh;
+        let isHoveringEnter = false;
+        let characterMeshes = {};
+        let sceneObjectMeshes = [];
+        let ambientLight, directionalLight;
+        let sunGroup, sunLight, sunSprite, sunMesh;
+        let loadedCount = 0;
+        const totalToLoad = SCENE_CHARACTERS.length + SCENE_OBJECTS_LAYOUT.length + 3 + 1;
+        // +3 = logo + torah + enter button, +1 = panorama
+
+        const textureLoader = new THREE.TextureLoader();
+        const gltfLoader = new GLTFLoader();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+        gltfLoader.setDRACOLoader(dracoLoader);
+
+        // ============ LOADING ============
+        function updateLoading(label) {
+            loadedCount++;
+            const pct = Math.min(100, Math.round((loadedCount / totalToLoad) * 100));
+            document.getElementById('loading-bar-inner').style.width = pct + '%';
+            document.getElementById('loading-status').textContent = label;
+            if (loadedCount >= totalToLoad) {
+                animate();
+                setTimeout(() => {
+                    const overlay = document.getElementById('loading-overlay');
+                    overlay.classList.add('fade-out');
+                    setTimeout(() => overlay.style.display = 'none', 800);
+                }, 400);
+            }
+        }
+
+        // ============ INIT ============
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            camera = new THREE.PerspectiveCamera(CAMERA_CONFIG.fov, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.set(0, CAMERA_CONFIG.height, 120);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            container.appendChild(renderer.domElement);
+
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+            pmremGenerator.dispose();
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = CAMERA_CONFIG.minDistance;
+            controls.maxDistance = CAMERA_CONFIG.maxDistance;
+            controls.target.set(CAMERA_CONFIG.targetX || 0, CAMERA_CONFIG.targetY, CAMERA_CONFIG.targetZ || 0);
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = CAMERA_CONFIG.autoRotateSpeed || 0.3;
+            controls.minPolarAngle = 0;
+            controls.maxPolarAngle = 1.6;
+            controls.update();
+
+            // Lighting (v10)
+            ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+            scene.add(ambientLight);
+            directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            // Bloom
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                BLOOM_CONFIG.strength, BLOOM_CONFIG.radius, BLOOM_CONFIG.threshold
+            );
+            composer.addPass(bloomPass);
+
+            // Build scene
+            createPanoramaSphere();
+            createSun();
+            loadSceneCharacters();
+            loadSceneObjects();
+            loadLogo();
+            loadTorah();
+            createEnterButton();
+
+            // Events
+            window.addEventListener('resize', onResize);
+            document.getElementById('enter-hitbox').addEventListener('click', onEnterClick);
+            document.getElementById('enter-hitbox').addEventListener('mouseenter', () => { isHoveringEnter = true; });
+            document.getElementById('enter-hitbox').addEventListener('mouseleave', () => { isHoveringEnter = false; });
+        }
+
+        // ============ PANORAMA SPHERE ============
+        function createPanoramaSphere() {
+            const geo = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 32);
+            geo.scale(-1, 1, 1);
+            panoramaMaterial = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+            panoramaSphere = new THREE.Mesh(geo, panoramaMaterial);
+            scene.add(panoramaSphere);
+
+            textureLoader.load(PANORAMA_PATH, (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                panoramaMaterial.map = tex;
+                panoramaMaterial.needsUpdate = true;
+                updateLoading('Panorama loaded');
+            });
+        }
+
+        // ============ SUN ============
+        function createSun() {
+            sunGroup = new THREE.Group();
+            sunGroup.name = 'sunGroup';
+
+            const geo = new THREE.SphereGeometry(SUN_CONFIG.radius, 32, 32);
+            const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SUN_CONFIG.color) });
+            sunMesh = new THREE.Mesh(geo, mat);
+            sunGroup.add(sunMesh);
+
+            // Glow sprite
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const c = new THREE.Color(SUN_CONFIG.glowColor);
+            const r = Math.round(c.r * 255), g = Math.round(c.g * 255), b = Math.round(c.b * 255);
+            const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+            grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1.0)`);
+            grad.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, 0.6)`);
+            grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.2)`);
+            grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.0)`);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 256, 256);
+            const spriteTex = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({
+                map: spriteTex, blending: THREE.AdditiveBlending,
+                transparent: true, depthWrite: false
+            });
+            sunSprite = new THREE.Sprite(spriteMat);
+            sunSprite.scale.set(SUN_CONFIG.radius * SUN_CONFIG.glowScale, SUN_CONFIG.radius * SUN_CONFIG.glowScale, 1);
+            sunGroup.add(sunSprite);
+
+            sunLight = new THREE.PointLight(new THREE.Color(SUN_CONFIG.color), SUN_CONFIG.intensity, 0, 1);
+            sunGroup.add(sunLight);
+
+            const phi = (Math.PI / 2) - SUN_CONFIG.elevation;
+            const sph = new THREE.Spherical(SUN_CONFIG.distance, phi, SUN_CONFIG.azimuth);
+            sunGroup.position.setFromSpherical(sph);
+
+            scene.add(sunGroup);
+        }
+
+        // Helper: reposition sun from SUN_CONFIG
+        function updateSunPosition() {
+            if (!sunGroup) return;
+            const phi = (Math.PI / 2) - SUN_CONFIG.elevation;
+            const sph = new THREE.Spherical(SUN_CONFIG.distance, phi, SUN_CONFIG.azimuth);
+            sunGroup.position.setFromSpherical(sph);
+        }
+
+        // ============ LOAD CHARACTERS ============
+        function loadSceneCharacters() {
+            for (const charDef of SCENE_CHARACTERS) {
+                const path = CHARACTER_MODELS[charDef.modelKey];
+                if (!path) { updateLoading(`Skip: ${charDef.modelKey}`); continue; }
+                gltfLoader.load(path, (gltf) => {
+                    const model = gltf.scene;
+                    model.position.set(charDef.x, charDef.y, charDef.z);
+                    model.rotation.set(charDef.rotX, charDef.rotY, charDef.rotZ);
+                    model.scale.setScalar(charDef.scale);
+                    model.userData.characterKey = charDef.modelKey;
+                    scene.add(model);
+                    characterMeshes[charDef.modelKey] = model;
+                    updateLoading(`Loaded ${charDef.modelKey}`);
+                }, undefined, (err) => {
+                    console.warn(`Failed to load ${charDef.modelKey}:`, err);
+                    updateLoading(`Failed: ${charDef.modelKey}`);
+                });
+            }
+        }
+
+        // ============ LOAD SCENE OBJECTS (static — shields + house) ============
+        function loadSceneObjects() {
+            const objectCache = {};
+            SCENE_OBJECTS_LAYOUT.forEach((objDef, idx) => {
+                const path = SCENE_OBJECTS[objDef.objectKey];
+                const place = (gltf) => {
+                    const model = gltf.scene.clone();
+                    model.position.set(objDef.x, objDef.y, objDef.z);
+                    model.rotation.set(objDef.rotX, objDef.rotY, objDef.rotZ);
+                    model.scale.setScalar(objDef.scale);
+                    scene.add(model);
+                    sceneObjectMeshes[idx] = { def: objDef, mesh: model };
+                    updateLoading(`Loaded ${objDef.objectKey}`);
+                };
+                if (objectCache[objDef.objectKey]) {
+                    place(objectCache[objDef.objectKey]);
+                } else {
+                    gltfLoader.load(path, (gltf) => {
+                        objectCache[objDef.objectKey] = gltf;
+                        place(gltf);
+                    }, undefined, (err) => {
+                        console.warn(`Failed to load ${objDef.objectKey}:`, err);
+                        updateLoading(`Failed: ${objDef.objectKey}`);
+                    });
+                }
+            });
+        }
+
+        // ============ LOAD LOGO (orbiting) ============
+        function loadLogo() {
+            const path = SCENE_OBJECTS[LOGO_CONFIG.objectKey];
+            gltfLoader.load(path, (gltf) => {
+                logoMesh = gltf.scene.clone();
+                logoMesh.scale.setScalar(LOGO_CONFIG.scale);
+                logoMesh.position.set(
+                    ORBIT_CENTER.x + LOGO_CONFIG.orbitRadius,
+                    LOGO_CONFIG.y,
+                    ORBIT_CENTER.z
+                );
+                logoMesh.rotation.set(0, 0, 0);
+                scene.add(logoMesh);
+                updateLoading('Loaded logo');
+            }, undefined, (err) => {
+                console.warn('Failed to load logo:', err);
+                updateLoading('Failed: logo');
+            });
+        }
+
+        // ============ LOAD TORAH (diagonal spin) ============
+        const TORAH_OBJ_IDX = SCENE_OBJECTS_LAYOUT.length; // index 5 in sceneObjectMeshes
+
+        function loadTorah() {
+            const path = SCENE_OBJECTS[TORAH_CONFIG.objectKey];
+            gltfLoader.load(path, (gltf) => {
+                torahMesh = gltf.scene;
+                torahMesh.position.set(TORAH_CONFIG.x, TORAH_CONFIG.y, TORAH_CONFIG.z);
+                torahMesh.rotation.set(TORAH_CONFIG.rotX, TORAH_CONFIG.rotY, TORAH_CONFIG.rotZ);
+                torahMesh.scale.set(
+                    TORAH_CONFIG.scale * TORAH_CONFIG.scaleW,
+                    TORAH_CONFIG.scale * TORAH_CONFIG.scaleH,
+                    TORAH_CONFIG.scale
+                );
+                scene.add(torahMesh);
+                sceneObjectMeshes[TORAH_OBJ_IDX] = { def: TORAH_CONFIG, mesh: torahMesh, isTorah: true };
+                updateLoading('Loaded torah');
+            }, undefined, (err) => {
+                console.warn('Failed to load torah:', err);
+                updateLoading('Failed: torah');
+            });
+        }
+
+        // ============ 3D ENTER BUTTON ============
+        let enterButtonLocked = true;
+        let enterTexLocked, enterTexUnlocked;
+
+        function drawRR(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        function buildButtonTexture(locked) {
+            const cfg = ENTER_BUTTON_CONFIG.buttonConfig;
+            const st = locked ? cfg.locked : cfg.unlocked;
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            const S = 2; // scale factor vs original 512x256
+
+            // Background fill
+            ctx.fillStyle = st.faceBg;
+            drawRR(ctx, 0, 0, 512*S, 256*S, 20*S);
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = st.borderColor;
+            ctx.lineWidth = st.borderWidth * S;
+            drawRR(ctx, 4*S, 4*S, 504*S, 248*S, 18*S);
+            ctx.stroke();
+
+            // Highlight (unlocked only)
+            if (!locked && st.highlightColor) {
+                ctx.strokeStyle = st.highlightColor;
+                ctx.lineWidth = 2 * S;
+                ctx.beginPath(); ctx.moveTo(24*S, 12*S); ctx.lineTo(488*S, 12*S); ctx.stroke();
+            }
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (locked) {
+                // Lock icon
+                const cx = 256*S, cy = 85*S;
+                ctx.strokeStyle = st.iconColor; ctx.lineWidth = 8*S;
+                ctx.beginPath(); ctx.arc(cx, cy - 10*S, 24*S, Math.PI, 0); ctx.stroke();
+                ctx.fillStyle = st.iconColor;
+                ctx.fillRect(cx - 30*S, cy + 2*S, 60*S, 42*S);
+                ctx.fillStyle = st.faceBg;
+                ctx.beginPath(); ctx.arc(cx, cy + 18*S, 8*S, 0, Math.PI * 2); ctx.fill();
+                ctx.fillRect(cx - 3*S, cy + 24*S, 6*S, 14*S);
+
+                // Text
+                ctx.fillStyle = st.textColor;
+                ctx.font = `bold ${st.textSize * S}px Segoe UI, Tahoma, sans-serif`;
+                ctx.fillText(st.text, 256*S, 190*S);
+            } else {
+                // Star of David icon
+                const cx = 256*S, cy = 80*S, sz = 30*S;
+                ctx.fillStyle = st.iconColor;
+                ctx.shadowColor = st.iconGlow || st.iconColor;
+                ctx.shadowBlur = (st.iconGlowBlur || 20) * S;
+                ctx.strokeStyle = st.iconColor; ctx.lineWidth = 3*S;
+                // Triangle pointing up
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - sz);
+                ctx.lineTo(cx + sz * 0.866, cy + sz * 0.5);
+                ctx.lineTo(cx - sz * 0.866, cy + sz * 0.5);
+                ctx.closePath(); ctx.stroke();
+                // Triangle pointing down
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + sz);
+                ctx.lineTo(cx + sz * 0.866, cy - sz * 0.5);
+                ctx.lineTo(cx - sz * 0.866, cy - sz * 0.5);
+                ctx.closePath(); ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // ENTER text with glow
+                ctx.shadowColor = st.textGlow || st.iconGlow || '#e8a94e';
+                ctx.shadowBlur = 14 * S;
+                ctx.fillStyle = st.textColor;
+                ctx.font = `bold ${st.textSize * S}px Segoe UI, Tahoma, sans-serif`;
+                ctx.fillText(st.text, 256*S, 185*S);
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.NearestFilter;
+            return tex;
+        }
+
+        function updateEnterButtonLock() {
+            const charVal = document.getElementById('character-select').value;
+            const bgVal = document.getElementById('background-select').value;
+            enterButtonLocked = !charVal || !bgVal;
+            if (!enterButtonGroup) return;
+            const cfg = ENTER_BUTTON_CONFIG.buttonConfig;
+            const st = enterButtonLocked ? cfg.locked : cfg.unlocked;
+            const faceMat = enterButtonGroup.children[0].material;
+            faceMat.map = enterButtonLocked ? enterTexLocked : enterTexUnlocked;
+            faceMat.opacity = st.faceOpacity;
+            faceMat.needsUpdate = true;
+            enterButtonGroup.children[1].material.opacity = st.rimOpacity;
+        }
+
+        function createEnterButton() {
+            const cfg = ENTER_BUTTON_CONFIG.buttonConfig;
+
+            enterButtonGroup = new THREE.Group();
+
+            // Face (front panel with texture)
+            enterTexLocked = buildButtonTexture(true);
+            enterTexUnlocked = buildButtonTexture(false);
+
+            const faceMat = new THREE.MeshBasicMaterial({
+                map: enterTexLocked,
+                transparent: true,
+                side: THREE.DoubleSide,
+                opacity: cfg.locked.faceOpacity,
+                color: (() => { const c = new THREE.Color('#f5ec00'); c.r = Math.min(c.r * 0.75, 1); c.g = Math.min(c.g * 0.75, 1); c.b = Math.min(c.b * 0.75, 1); return c; })(),
+            });
+            const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(90, 45), faceMat);
+            faceMesh.position.z = 6.1;
+            enterButtonGroup.add(faceMesh);
+
+            // Rim (box behind face for 3D depth)
+            const rimMat = new THREE.MeshBasicMaterial({
+                color: new THREE.Color(cfg.rimColor),
+                transparent: true,
+                opacity: cfg.locked.rimOpacity,
+            });
+            enterButtonGroup.add(new THREE.Mesh(new THREE.BoxGeometry(94, 49, 12), rimMat));
+
+            // Edge highlights
+            const edgeMat = new THREE.LineBasicMaterial({
+                color: new THREE.Color(cfg.edgeColor),
+                transparent: true,
+                opacity: cfg.edgeOpacity,
+            });
+            enterButtonGroup.add(new THREE.LineSegments(
+                new THREE.EdgesGeometry(new THREE.BoxGeometry(94, 49, 12)),
+                edgeMat
+            ));
+
+            // Initial position — will be overridden by orbit in animate()
+            enterButtonGroup.position.set(
+                ORBIT_CENTER.x + ENTER_BUTTON_CONFIG.orbitRadius,
+                ORBIT_CENTER.y,
+                ORBIT_CENTER.z
+            );
+            enterButtonGroup.scale.set(0.3 * 0.9, 0.3 * 2.3, 0.3);
+            enterButtonGroup.renderOrder = 999;
+            enterButtonGroup.name = 'enterButton';
+            scene.add(enterButtonGroup);
+
+            enterButton3D = enterButtonGroup;
+            updateLoading('Built enter button');
+
+            document.getElementById('character-select').addEventListener('change', updateEnterButtonLock);
+            document.getElementById('background-select').addEventListener('change', updateEnterButtonLock);
+        }
+
+        // ============ EVENT HANDLERS ============
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onEnterClick() {
+            const character = document.getElementById('character-select').value;
+            const background = document.getElementById('background-select').value;
+            if (!character || !background) return;
+            const APP_URL = 'http://localhost:3000';
+            const url = `${APP_URL}?character=${encodeURIComponent(character)}&background=${encodeURIComponent(background)}`;
+            window.location = url;
+        }
+
+        // ============ ANIMATION LOOP ============
+        const clock = new THREE.Clock();
+        let logoOrbitAngle = 0;
+        // Quaternion for torah diagonal spin
+        const torahSpinAxis = new THREE.Vector3(
+            TORAH_CONFIG.diagonalSpin.axisX,
+            TORAH_CONFIG.diagonalSpin.axisY,
+            TORAH_CONFIG.diagonalSpin.axisZ
+        ).normalize();
+        const torahSpinQuat = new THREE.Quaternion();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            controls.update();
+
+            // --- Logo orbit around house_of_light (same method as WS3D sandbox) ---
+            if (logoMesh) {
+                logoOrbitAngle += LOGO_CONFIG.orbitSpeed * dt;
+                const cx = ORBIT_CENTER.x, cz = ORBIT_CENTER.z;
+                logoMesh.position.x = cx + Math.cos(logoOrbitAngle) * LOGO_CONFIG.orbitRadius;
+                logoMesh.position.z = cz + Math.sin(logoOrbitAngle) * LOGO_CONFIG.orbitRadius;
+                logoMesh.position.y = LOGO_CONFIG.y + Math.sin(elapsed * 0.3) * 3;
+                // Face center — exact formula from WS3D sandbox
+                logoMesh.rotation.y = Math.atan2(cx - logoMesh.position.x, cz - logoMesh.position.z) + Math.PI;
+                logoMesh.rotation.x = LOGO_CONFIG.rotX;
+                logoMesh.rotation.z = LOGO_CONFIG.rotZ;
+            }
+
+            // --- Torah diagonal spin ---
+            if (torahMesh) {
+                torahSpinQuat.setFromAxisAngle(torahSpinAxis, TORAH_CONFIG.diagonalSpin.speed * dt);
+                torahMesh.quaternion.premultiply(torahSpinQuat);
+            }
+
+            // --- Enter button orbit (opposite direction) ---
+            if (enterButton3D) {
+                const btnAngle = elapsed * ENTER_BUTTON_CONFIG.orbitSpeed;
+                enterButton3D.position.x = ORBIT_CENTER.x + Math.cos(btnAngle) * ENTER_BUTTON_CONFIG.orbitRadius;
+                enterButton3D.position.z = ORBIT_CENTER.z + Math.sin(btnAngle) * ENTER_BUTTON_CONFIG.orbitRadius;
+                enterButton3D.position.y = ORBIT_CENTER.y + Math.sin(elapsed * 1.2) * 2;
+
+                // Face outward (away from center)
+                enterButton3D.lookAt(ORBIT_CENTER.x, ORBIT_CENTER.y, ORBIT_CENTER.z);
+                enterButton3D.rotation.y += Math.PI;
+
+                // Hover scale pulse (preserve non-uniform base scale)
+                const baseX = 0.3 * 0.9, baseY = 0.3 * 2.3, baseZ = 0.3;
+                const targetMul = isHoveringEnter ? 1.15 : 1.0;
+                const curMul = enterButton3D.scale.x / baseX;
+                const mul = curMul + (targetMul - curMul) * 0.1;
+                enterButton3D.scale.set(baseX * mul, baseY * mul, baseZ * mul);
+
+                // Project to screen for hitbox
+                const btnScreenPos = enterButton3D.position.clone().project(camera);
+                const hitbox = document.getElementById('enter-hitbox');
+                hitbox.style.left = (btnScreenPos.x * 0.5 + 0.5) * window.innerWidth + 'px';
+                hitbox.style.top = (-btnScreenPos.y * 0.5 + 0.5) * window.innerHeight + 'px';
+                hitbox.style.cursor = enterButtonLocked ? 'not-allowed' : 'pointer';
+                hitbox.style.pointerEvents = enterButtonLocked ? 'none' : 'auto';
+            }
+
+            // --- Gentle float on characters ---
+            for (const charDef of SCENE_CHARACTERS) {
+                const mesh = characterMeshes[charDef.modelKey];
+                if (mesh) {
+                    mesh.position.y = charDef.y + Math.sin(elapsed * 0.5 + charDef.x * 0.1) * 1.5;
+                }
+            }
+
+            composer.render();
+        }
+
+        // ============ TUNING HELPERS ============
+        function rebuildEnterButtonTextures() {
+            enterTexLocked = buildButtonTexture(true);
+            enterTexUnlocked = buildButtonTexture(false);
+            updateEnterButtonLock();
+        }
+
+        function rgbaToHex(rgba) {
+            if (rgba.startsWith('#')) return rgba;
+            const match = rgba.match(/[\d.]+/g);
+            if (!match) return '#ffffff';
+            const [r, g, b] = match.map(Number);
+            return '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+        }
+
+        function tintMesh(mesh, color, intensity) {
+            mesh.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(mat => {
+                        if (!mat.userData.originalColor) mat.userData.originalColor = mat.color.clone();
+                        const orig = mat.userData.originalColor;
+                        const tint = new THREE.Color(color);
+                        mat.color.copy(orig).lerp(tint, intensity);
+                    });
+                }
+            });
+        }
+
+        function setMeshOpacity(mesh, opacity) {
+            mesh.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(mat => {
+                        mat.transparent = opacity < 1;
+                        mat.opacity = opacity;
+                        mat.needsUpdate = true;
+                    });
+                }
+            });
+        }
+
+        // ============ TUNING PANEL ============
+        function setupTuningPanel() {
+            const toggleBtn = document.getElementById('tune-toggle');
+            const panel = document.getElementById('tune-panel');
+            let panelVisible = false;
+
+            toggleBtn.addEventListener('click', () => {
+                panelVisible = !panelVisible;
+                panel.style.display = panelVisible ? 'block' : 'none';
+                toggleBtn.textContent = panelVisible ? 'Close' : 'Tune';
+            });
+
+            // ── Helpers ──
+
+            function makeSlider(container, label, value, min, max, step, onChange) {
+                const row = document.createElement('div');
+                row.className = 'tune-row';
+                const lbl = document.createElement('label');
+                lbl.textContent = label;
+                lbl.className = 'tune-label';
+                const input = document.createElement('input');
+                input.type = 'range';
+                input.className = 'tune-slider';
+                input.min = min; input.max = max; input.step = step;
+                input.value = value;
+                const minusBtn = document.createElement('button');
+                minusBtn.className = 'tune-nudge';
+                minusBtn.textContent = '-';
+                const val = document.createElement('span');
+                val.className = 'tune-val';
+                val.textContent = Number(value).toFixed(2);
+                const plusBtn = document.createElement('button');
+                plusBtn.className = 'tune-nudge';
+                plusBtn.textContent = '+';
+                function fire(v) {
+                    v = Math.max(min, Math.min(max, v));
+                    input.value = v;
+                    val.textContent = Number(v).toFixed(2);
+                    onChange(v);
+                }
+                input.addEventListener('input', () => fire(parseFloat(input.value)));
+                minusBtn.addEventListener('click', () => fire(parseFloat(input.value) - step));
+                plusBtn.addEventListener('click', () => fire(parseFloat(input.value) + step));
+                row.append(lbl, input, minusBtn, val, plusBtn);
+                container.appendChild(row);
+                return {
+                    input, val,
+                    update(v) { input.value = v; val.textContent = Number(v).toFixed(2); }
+                };
+            }
+
+            function makeSelect(container, label, options, selectedValue, onChange) {
+                const row = document.createElement('div');
+                row.className = 'tune-row';
+                const lbl = document.createElement('label');
+                lbl.textContent = label;
+                lbl.className = 'tune-label';
+                const select = document.createElement('select');
+                select.className = 'tune-select';
+                options.forEach(opt => {
+                    const o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.label;
+                    if (opt.value === selectedValue) o.selected = true;
+                    select.appendChild(o);
+                });
+                select.addEventListener('change', () => onChange(select.value));
+                row.append(lbl, select);
+                container.appendChild(row);
+                return select;
+            }
+
+            function makeColorPicker(container, label, value, onChange) {
+                const row = document.createElement('div');
+                row.className = 'tune-row';
+                const lbl = document.createElement('label');
+                lbl.textContent = label;
+                lbl.className = 'tune-label';
+                const input = document.createElement('input');
+                input.type = 'color';
+                input.value = rgbaToHex(value);
+                input.style.cssText = 'width:32px;height:22px;border:1px solid #4b5563;border-radius:3px;background:transparent;cursor:pointer;padding:0;flex-shrink:0;';
+                const val = document.createElement('span');
+                val.className = 'tune-val';
+                val.textContent = rgbaToHex(value);
+                input.addEventListener('input', () => {
+                    val.textContent = input.value;
+                    onChange(input.value);
+                });
+                row.append(lbl, input, val);
+                container.appendChild(row);
+                return { input, val, update(v) { input.value = rgbaToHex(v); val.textContent = rgbaToHex(v); } };
+            }
+
+            function makeSubSection(parent, title) {
+                const details = document.createElement('details');
+                const summary = document.createElement('summary');
+                summary.textContent = title;
+                summary.style.cssText = 'font-size:11px;color:#9ca3af;cursor:pointer;margin:4px 0;user-select:none;';
+                details.appendChild(summary);
+                const content = document.createElement('div');
+                content.className = 'tune-section-content';
+                details.appendChild(content);
+                parent.appendChild(details);
+                return content;
+            }
+
+            function makeSection(title, color, open = false) {
+                const details = document.createElement('details');
+                if (open) details.open = true;
+                const summary = document.createElement('summary');
+                summary.textContent = title;
+                summary.style.color = color;
+                summary.className = 'tune-summary';
+                details.appendChild(summary);
+                const content = document.createElement('div');
+                content.className = 'tune-section-content';
+                details.appendChild(content);
+                panel.appendChild(details);
+                return content;
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // SELECTED CHARACTER
+            // ═══════════════════════════════════════════════════════
+            const charSection = makeSection('Selected Character', '#60a5fa');
+            const charOptions = SCENE_CHARACTERS.map((c, i) => ({
+                value: String(i), label: c.modelKey.replace(/_/g, ' ')
+            }));
+            let selectedCharIdx = 0;
+            const charSliders = {};
+
+            function updateCharSliders() {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                const mesh = characterMeshes[def.modelKey];
+                charSliders.x.update(mesh ? mesh.position.x : def.x);
+                charSliders.y.update(def.y);
+                charSliders.z.update(mesh ? mesh.position.z : def.z);
+                charSliders.rotX.update(mesh ? mesh.rotation.x : def.rotX);
+                charSliders.rotY.update(mesh ? mesh.rotation.y : def.rotY);
+                charSliders.rotZ.update(mesh ? mesh.rotation.z : def.rotZ);
+                charSliders.scale.update(mesh ? mesh.scale.x : def.scale);
+            }
+
+            makeSelect(charSection, 'Character', charOptions, '0', v => {
+                selectedCharIdx = parseInt(v);
+                updateCharSliders();
+            });
+
+            const c0 = SCENE_CHARACTERS[0];
+            charSliders.x = makeSlider(charSection, 'Pos X', c0.x, -200, 200, 0.1, v => {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                def.x = v;
+                const mesh = characterMeshes[def.modelKey];
+                if (mesh) mesh.position.x = v;
+            });
+            charSliders.y = makeSlider(charSection, 'Pos Y', c0.y, -200, 200, 0.1, v => {
+                SCENE_CHARACTERS[selectedCharIdx].y = v;
+            });
+            charSliders.z = makeSlider(charSection, 'Pos Z', c0.z, -200, 200, 0.1, v => {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                def.z = v;
+                const mesh = characterMeshes[def.modelKey];
+                if (mesh) mesh.position.z = v;
+            });
+            charSliders.rotX = makeSlider(charSection, 'Rot X', c0.rotX, -3.14, 3.14, 0.01, v => {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                def.rotX = v;
+                const mesh = characterMeshes[def.modelKey];
+                if (mesh) mesh.rotation.x = v;
+            });
+            charSliders.rotY = makeSlider(charSection, 'Rot Y', c0.rotY, -3.14, 3.14, 0.01, v => {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                def.rotY = v;
+                const mesh = characterMeshes[def.modelKey];
+                if (mesh) mesh.rotation.y = v;
+            });
+            charSliders.rotZ = makeSlider(charSection, 'Rot Z', c0.rotZ, -3.14, 3.14, 0.01, v => {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                def.rotZ = v;
+                const mesh = characterMeshes[def.modelKey];
+                if (mesh) mesh.rotation.z = v;
+            });
+            charSliders.scale = makeSlider(charSection, 'Scale', c0.scale, 0.1, 100, 0.5, v => {
+                const def = SCENE_CHARACTERS[selectedCharIdx];
+                def.scale = v;
+                const mesh = characterMeshes[def.modelKey];
+                if (mesh) mesh.scale.setScalar(v);
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // SCENE OBJECTS (house, shields, torah)
+            // ═══════════════════════════════════════════════════════
+            const objSection = makeSection('Scene Objects', '#fbbf24');
+            const objNames = [
+                'House of Light',
+                'Shield 1 (right)',
+                'Shield 2 (left)',
+                'Shield 3 (back)',
+                'Shield 4 (front)',
+                'Torah'
+            ];
+            const objOptions = objNames.map((name, i) => ({ value: String(i), label: name }));
+            let selectedObjIdx = 0;
+            const objSliders = {};
+
+            // Torah-specific extras container (hidden unless Torah selected)
+            const torahExtras = document.createElement('div');
+            torahExtras.style.display = 'none';
+
+            function isTorah() { return selectedObjIdx === TORAH_OBJ_IDX; }
+
+            function updateObjSliders() {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                const m = entry.mesh;
+                objSliders.x.update(m.position.x);
+                objSliders.y.update(m.position.y);
+                objSliders.z.update(m.position.z);
+                objSliders.rotX.update(m.rotation.x);
+                objSliders.rotY.update(m.rotation.y);
+                objSliders.rotZ.update(m.rotation.z);
+                if (isTorah()) {
+                    objSliders.scale.update(TORAH_CONFIG.scale);
+                    objSliders.scaleW.update(TORAH_CONFIG.scaleW);
+                    objSliders.scaleH.update(TORAH_CONFIG.scaleH);
+                    objSliders.spinSpeed.update(TORAH_CONFIG.diagonalSpin.speed);
+                } else {
+                    objSliders.scale.update(m.scale.x);
+                }
+                torahExtras.style.display = isTorah() ? 'block' : 'none';
+            }
+
+            makeSelect(objSection, 'Object', objOptions, '0', v => {
+                selectedObjIdx = parseInt(v);
+                updateObjSliders();
+            });
+
+            const o0 = SCENE_OBJECTS_LAYOUT[0];
+            objSliders.x = makeSlider(objSection, 'Pos X', o0.x, -200, 200, 0.1, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                entry.mesh.position.x = v;
+                if (isTorah()) TORAH_CONFIG.x = v;
+            });
+            objSliders.y = makeSlider(objSection, 'Pos Y', o0.y, -200, 200, 0.1, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                entry.mesh.position.y = v;
+                if (isTorah()) TORAH_CONFIG.y = v;
+            });
+            objSliders.z = makeSlider(objSection, 'Pos Z', o0.z, -200, 200, 0.1, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                entry.mesh.position.z = v;
+                if (isTorah()) TORAH_CONFIG.z = v;
+            });
+            objSliders.rotX = makeSlider(objSection, 'Rot X', o0.rotX, -3.14, 3.14, 0.01, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                entry.mesh.rotation.x = v;
+                if (isTorah()) TORAH_CONFIG.rotX = v;
+            });
+            objSliders.rotY = makeSlider(objSection, 'Rot Y', o0.rotY, -3.14, 3.14, 0.01, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                entry.mesh.rotation.y = v;
+                if (isTorah()) TORAH_CONFIG.rotY = v;
+            });
+            objSliders.rotZ = makeSlider(objSection, 'Rot Z', o0.rotZ, -3.14, 3.14, 0.01, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                entry.mesh.rotation.z = v;
+                if (isTorah()) TORAH_CONFIG.rotZ = v;
+            });
+            objSliders.scale = makeSlider(objSection, 'Scale', o0.scale, 0.1, 200, 0.5, v => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                if (isTorah()) {
+                    TORAH_CONFIG.scale = v;
+                    entry.mesh.scale.set(v * TORAH_CONFIG.scaleW, v * TORAH_CONFIG.scaleH, v);
+                } else {
+                    entry.mesh.scale.setScalar(v);
+                }
+            });
+
+            // Torah-specific sliders
+            objSection.appendChild(torahExtras);
+            objSliders.scaleW = makeSlider(torahExtras, 'Scale W', TORAH_CONFIG.scaleW, 0.1, 5, 0.05, v => {
+                TORAH_CONFIG.scaleW = v;
+                if (torahMesh) torahMesh.scale.set(TORAH_CONFIG.scale * v, TORAH_CONFIG.scale * TORAH_CONFIG.scaleH, TORAH_CONFIG.scale);
+            });
+            objSliders.scaleH = makeSlider(torahExtras, 'Scale H', TORAH_CONFIG.scaleH, 0.1, 5, 0.05, v => {
+                TORAH_CONFIG.scaleH = v;
+                if (torahMesh) torahMesh.scale.set(TORAH_CONFIG.scale * TORAH_CONFIG.scaleW, TORAH_CONFIG.scale * v, TORAH_CONFIG.scale);
+            });
+            objSliders.spinSpeed = makeSlider(torahExtras, 'Spin Spd', TORAH_CONFIG.diagonalSpin.speed, 0, 3, 0.05, v => {
+                TORAH_CONFIG.diagonalSpin.speed = v;
+            });
+
+            // ── Material Controls (tint/opacity) ──
+            const matSubSection = makeSubSection(objSection, 'Material Tint');
+            const objTintState = { color: '#ffffff', intensity: 0, opacity: 1 };
+            makeColorPicker(matSubSection, 'Tint Color', '#ffffff', v => {
+                objTintState.color = v;
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (entry) tintMesh(entry.mesh, v, objTintState.intensity);
+            });
+            makeSlider(matSubSection, 'Tint Amt', 0, 0, 1, 0.05, v => {
+                objTintState.intensity = v;
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (entry) tintMesh(entry.mesh, objTintState.color, v);
+            });
+            makeSlider(matSubSection, 'Opacity', 1, 0, 1, 0.05, v => {
+                objTintState.opacity = v;
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (entry) setMeshOpacity(entry.mesh, v);
+            });
+
+            // ── Add / Remove Object ──
+            const objActionsRow = document.createElement('div');
+            objActionsRow.style.cssText = 'display:flex;gap:4px;margin-top:8px;';
+
+            const addObjSelect = document.createElement('select');
+            addObjSelect.className = 'tune-select';
+            addObjSelect.style.flex = '1';
+            Object.keys(SCENE_OBJECTS).forEach(k => {
+                const o = document.createElement('option');
+                o.value = k; o.textContent = k.replace(/^bo_/, '').replace(/_/g, ' ');
+                addObjSelect.appendChild(o);
+            });
+
+            const addObjBtn = document.createElement('button');
+            addObjBtn.textContent = '+ Add';
+            addObjBtn.className = 'tune-copy-btn';
+            addObjBtn.style.cssText = 'margin:0;padding:4px 8px;width:auto;font-size:11px;';
+            addObjBtn.addEventListener('click', () => {
+                const key = addObjSelect.value;
+                const path = SCENE_OBJECTS[key];
+                if (!path) return;
+                gltfLoader.load(path, (gltf) => {
+                    const model = gltf.scene.clone();
+                    model.position.set(0, 0, 0);
+                    model.scale.setScalar(10);
+                    scene.add(model);
+                    const newIdx = sceneObjectMeshes.length;
+                    const newDef = { objectKey: key, x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 10 };
+                    sceneObjectMeshes[newIdx] = { def: newDef, mesh: model };
+                    // Add to dropdown
+                    const objSelect = objSection.querySelector('select');
+                    const opt = document.createElement('option');
+                    opt.value = String(newIdx);
+                    opt.textContent = key.replace(/^bo_/, '').replace(/_/g, ' ') + ' (added)';
+                    objSelect.appendChild(opt);
+                    objSelect.value = String(newIdx);
+                    selectedObjIdx = newIdx;
+                    torahExtras.style.display = 'none';
+                    updateObjSliders();
+                });
+            });
+
+            const removeObjBtn = document.createElement('button');
+            removeObjBtn.textContent = 'Remove';
+            removeObjBtn.style.cssText = 'margin:0;padding:4px 8px;width:auto;font-size:11px;background:#991b1b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:bold;';
+            removeObjBtn.addEventListener('click', () => {
+                const entry = sceneObjectMeshes[selectedObjIdx];
+                if (!entry) return;
+                scene.remove(entry.mesh);
+                entry.mesh.traverse(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                        else child.material.dispose();
+                    }
+                });
+                sceneObjectMeshes[selectedObjIdx] = null;
+                // Remove option from dropdown
+                const objSelect = objSection.querySelector('select');
+                const opt = objSelect.querySelector(`option[value="${selectedObjIdx}"]`);
+                if (opt) opt.remove();
+                // Select first available
+                if (objSelect.options.length > 0) {
+                    objSelect.selectedIndex = 0;
+                    selectedObjIdx = parseInt(objSelect.value);
+                    updateObjSliders();
+                }
+            });
+
+            objActionsRow.append(addObjSelect, addObjBtn, removeObjBtn);
+            objSection.appendChild(objActionsRow);
+
+            // ═══════════════════════════════════════════════════════
+            // LOGO
+            // ═══════════════════════════════════════════════════════
+            const logoSection = makeSection('Logo', '#06b6d4');
+            makeSlider(logoSection, 'Y', LOGO_CONFIG.y, -100, 200, 0.1, v => { LOGO_CONFIG.y = v; });
+            makeSlider(logoSection, 'Rot X', LOGO_CONFIG.rotX, -3.14, 3.14, 0.01, v => { LOGO_CONFIG.rotX = v; });
+            makeSlider(logoSection, 'Rot Z', LOGO_CONFIG.rotZ, -3.14, 3.14, 0.01, v => { LOGO_CONFIG.rotZ = v; });
+            makeSlider(logoSection, 'Scale', LOGO_CONFIG.scale, 0.1, 200, 0.5, v => {
+                LOGO_CONFIG.scale = v;
+                if (logoMesh) logoMesh.scale.setScalar(v);
+            });
+            makeSlider(logoSection, 'Orbit Spd', LOGO_CONFIG.orbitSpeed, 0, 2, 0.01, v => { LOGO_CONFIG.orbitSpeed = v; });
+            makeSlider(logoSection, 'Orbit Rad', LOGO_CONFIG.orbitRadius, 0, 200, 0.5, v => { LOGO_CONFIG.orbitRadius = v; });
+
+            // ═══════════════════════════════════════════════════════
+            // CAMERA
+            // ═══════════════════════════════════════════════════════
+            const camSection = makeSection('Camera', '#eab308');
+            makeSlider(camSection, 'FOV', CAMERA_CONFIG.fov, 10, 179, 1, v => {
+                camera.fov = v;
+                camera.updateProjectionMatrix();
+            });
+            makeSlider(camSection, 'Min Dist', CAMERA_CONFIG.minDistance, 1, 500, 1, v => {
+                controls.minDistance = v;
+            });
+            makeSlider(camSection, 'Max Dist', CAMERA_CONFIG.maxDistance, 1, 500, 1, v => {
+                controls.maxDistance = v;
+            });
+            makeSlider(camSection, 'Center X', CAMERA_CONFIG.targetX || 0, -200, 200, 0.1, v => {
+                controls.target.x = v;
+            });
+            makeSlider(camSection, 'Center Y', CAMERA_CONFIG.targetY, -100, 200, 0.1, v => {
+                controls.target.y = v;
+            });
+            makeSlider(camSection, 'Center Z', CAMERA_CONFIG.targetZ || 0, -200, 200, 0.1, v => {
+                controls.target.z = v;
+            });
+            makeSlider(camSection, 'AutoRot Spd', CAMERA_CONFIG.autoRotateSpeed || 0.3, -2, 2, 0.05, v => {
+                controls.autoRotateSpeed = v;
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // ENTER BUTTON
+            // ═══════════════════════════════════════════════════════
+            const enterSection = makeSection('Enter Button', '#a78bfa');
+            const btnCfg = ENTER_BUTTON_CONFIG.buttonConfig;
+            makeSlider(enterSection, 'Orbit Spd', ENTER_BUTTON_CONFIG.orbitSpeed, -2, 2, 0.01, v => {
+                ENTER_BUTTON_CONFIG.orbitSpeed = v;
+            });
+            makeSlider(enterSection, 'Orbit Rad', ENTER_BUTTON_CONFIG.orbitRadius, 0, 200, 0.5, v => {
+                ENTER_BUTTON_CONFIG.orbitRadius = v;
+            });
+
+            // Shared button properties
+            const btnShared = makeSubSection(enterSection, 'Shared');
+            makeColorPicker(btnShared, 'Rim Color', btnCfg.rimColor, v => { btnCfg.rimColor = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnShared, 'Edge Color', btnCfg.edgeColor, v => { btnCfg.edgeColor = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnShared, 'Edge Opac', btnCfg.edgeOpacity, 0, 1, 0.05, v => { btnCfg.edgeOpacity = v; rebuildEnterButtonTextures(); });
+
+            // Locked state
+            const btnLocked = makeSubSection(enterSection, 'Locked State');
+            makeColorPicker(btnLocked, 'Face BG', btnCfg.locked.faceBg, v => { btnCfg.locked.faceBg = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnLocked, 'Border', btnCfg.locked.borderColor, v => { btnCfg.locked.borderColor = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnLocked, 'Border W', btnCfg.locked.borderWidth, 0, 10, 0.5, v => { btnCfg.locked.borderWidth = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnLocked, 'Icon', btnCfg.locked.iconColor, v => { btnCfg.locked.iconColor = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnLocked, 'Text', btnCfg.locked.textColor, v => { btnCfg.locked.textColor = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnLocked, 'Text Size', btnCfg.locked.textSize, 10, 80, 1, v => { btnCfg.locked.textSize = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnLocked, 'Face Opac', btnCfg.locked.faceOpacity, 0, 1, 0.05, v => { btnCfg.locked.faceOpacity = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnLocked, 'Rim Opac', btnCfg.locked.rimOpacity, 0, 1, 0.05, v => { btnCfg.locked.rimOpacity = v; rebuildEnterButtonTextures(); });
+
+            // Unlocked state
+            const btnUnlocked = makeSubSection(enterSection, 'Unlocked State');
+            makeColorPicker(btnUnlocked, 'Face BG', btnCfg.unlocked.faceBg, v => { btnCfg.unlocked.faceBg = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnUnlocked, 'Border', btnCfg.unlocked.borderColor, v => { btnCfg.unlocked.borderColor = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnUnlocked, 'Border W', btnCfg.unlocked.borderWidth, 0, 10, 0.5, v => { btnCfg.unlocked.borderWidth = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnUnlocked, 'Highlight', btnCfg.unlocked.highlightColor, v => { btnCfg.unlocked.highlightColor = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnUnlocked, 'Icon', btnCfg.unlocked.iconColor, v => { btnCfg.unlocked.iconColor = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnUnlocked, 'Icon Glow', btnCfg.unlocked.iconGlow, v => { btnCfg.unlocked.iconGlow = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnUnlocked, 'Glow Blur', btnCfg.unlocked.iconGlowBlur, 0, 30, 1, v => { btnCfg.unlocked.iconGlowBlur = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnUnlocked, 'Text', btnCfg.unlocked.textColor, v => { btnCfg.unlocked.textColor = v; rebuildEnterButtonTextures(); });
+            makeColorPicker(btnUnlocked, 'Text Glow', btnCfg.unlocked.textGlow, v => { btnCfg.unlocked.textGlow = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnUnlocked, 'Text Size', btnCfg.unlocked.textSize, 10, 80, 1, v => { btnCfg.unlocked.textSize = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnUnlocked, 'Face Opac', btnCfg.unlocked.faceOpacity, 0, 1, 0.05, v => { btnCfg.unlocked.faceOpacity = v; rebuildEnterButtonTextures(); });
+            makeSlider(btnUnlocked, 'Rim Opac', btnCfg.unlocked.rimOpacity, 0, 1, 0.05, v => { btnCfg.unlocked.rimOpacity = v; rebuildEnterButtonTextures(); });
+
+            // ═══════════════════════════════════════════════════════
+            // SUN
+            // ═══════════════════════════════════════════════════════
+            const sunSection = makeSection('Sun', '#fde047');
+            makeSlider(sunSection, 'Distance', SUN_CONFIG.distance, 1, 200, 0.5, v => {
+                SUN_CONFIG.distance = v; updateSunPosition();
+            });
+            makeSlider(sunSection, 'Elevation', SUN_CONFIG.elevation, -1.57, 1.57, 0.01, v => {
+                SUN_CONFIG.elevation = v; updateSunPosition();
+            });
+            makeSlider(sunSection, 'Azimuth', SUN_CONFIG.azimuth, -3.14, 3.14, 0.01, v => {
+                SUN_CONFIG.azimuth = v; updateSunPosition();
+            });
+            makeSlider(sunSection, 'Intensity', SUN_CONFIG.intensity, 0, 50, 0.5, v => {
+                if (sunLight) sunLight.intensity = v;
+                SUN_CONFIG.intensity = v;
+            });
+            makeSlider(sunSection, 'Radius', SUN_CONFIG.radius, 0.1, 50, 0.5, v => {
+                SUN_CONFIG.radius = v;
+                // Rebuild sun sphere geometry
+                if (sunMesh) {
+                    sunMesh.geometry.dispose();
+                    sunMesh.geometry = new THREE.SphereGeometry(v, 32, 32);
+                }
+                if (sunSprite) sunSprite.scale.set(v * SUN_CONFIG.glowScale, v * SUN_CONFIG.glowScale, 1);
+            });
+            makeSlider(sunSection, 'Glow Scale', SUN_CONFIG.glowScale, 0, 100, 0.5, v => {
+                SUN_CONFIG.glowScale = v;
+                if (sunSprite) sunSprite.scale.set(SUN_CONFIG.radius * v, SUN_CONFIG.radius * v, 1);
+            });
+            makeColorPicker(sunSection, 'Color', SUN_CONFIG.color, v => {
+                SUN_CONFIG.color = v;
+                if (sunMesh) sunMesh.material.color.set(v);
+                if (sunLight) sunLight.color.set(v);
+            });
+            makeColorPicker(sunSection, 'Glow Color', SUN_CONFIG.glowColor, v => {
+                SUN_CONFIG.glowColor = v;
+                // Glow sprite needs texture rebuild — store for Copy Config
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // BLOOM
+            // ═══════════════════════════════════════════════════════
+            const bloomSection = makeSection('Bloom', '#c084fc');
+            makeSlider(bloomSection, 'Strength', BLOOM_CONFIG.strength, 0, 5, 0.05, v => {
+                if (bloomPass) bloomPass.strength = v;
+            });
+            makeSlider(bloomSection, 'Threshold', BLOOM_CONFIG.threshold, 0, 1, 0.01, v => {
+                if (bloomPass) bloomPass.threshold = v;
+            });
+            makeSlider(bloomSection, 'Radius', BLOOM_CONFIG.radius, 0, 2, 0.01, v => {
+                if (bloomPass) bloomPass.radius = v;
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // LIGHTING
+            // ═══════════════════════════════════════════════════════
+            const lightSection = makeSection('Lighting', '#f97316');
+            makeSlider(lightSection, 'Ambient', 1.1, 0, 5, 0.05, v => {
+                if (ambientLight) ambientLight.intensity = v;
+            });
+            makeSlider(lightSection, 'Direct.', 0.6, 0, 5, 0.05, v => {
+                if (directionalLight) directionalLight.intensity = v;
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // COPY CONFIG
+            // ═══════════════════════════════════════════════════════
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = 'Copy Config to Clipboard';
+            copyBtn.className = 'tune-copy-btn';
+            copyBtn.addEventListener('click', () => {
+                const config = {
+                    SCENE_CHARACTERS: SCENE_CHARACTERS.map(c => {
+                        const mesh = characterMeshes[c.modelKey];
+                        return {
+                            modelKey: c.modelKey,
+                            x: +((mesh ? mesh.position.x : c.x).toFixed(1)),
+                            y: +(c.y.toFixed(1)),
+                            z: +((mesh ? mesh.position.z : c.z).toFixed(1)),
+                            rotX: +((mesh ? mesh.rotation.x : c.rotX).toFixed(2)),
+                            rotY: +((mesh ? mesh.rotation.y : c.rotY).toFixed(2)),
+                            rotZ: +((mesh ? mesh.rotation.z : c.rotZ).toFixed(2)),
+                            scale: +((mesh ? mesh.scale.x : c.scale).toFixed(1)),
+                        };
+                    }),
+                    SCENE_OBJECTS_LAYOUT: sceneObjectMeshes.filter(Boolean).filter(e => !e.isTorah).map(entry => {
+                        const m = entry.mesh;
+                        return {
+                            objectKey: entry.def.objectKey,
+                            x: +(m.position.x.toFixed(1)),
+                            y: +(m.position.y.toFixed(1)),
+                            z: +(m.position.z.toFixed(1)),
+                            rotX: +(m.rotation.x.toFixed(2)),
+                            rotY: +(m.rotation.y.toFixed(2)),
+                            rotZ: +(m.rotation.z.toFixed(2)),
+                            scale: +(m.scale.x.toFixed(1)),
+                        };
+                    }),
+                    TORAH_CONFIG: {
+                        objectKey: TORAH_CONFIG.objectKey,
+                        x: +(torahMesh ? torahMesh.position.x : TORAH_CONFIG.x).toFixed(1),
+                        y: +(torahMesh ? torahMesh.position.y : TORAH_CONFIG.y).toFixed(1),
+                        z: +(torahMesh ? torahMesh.position.z : TORAH_CONFIG.z).toFixed(1),
+                        rotX: +(torahMesh ? torahMesh.rotation.x : TORAH_CONFIG.rotX).toFixed(2),
+                        rotY: +(torahMesh ? torahMesh.rotation.y : TORAH_CONFIG.rotY).toFixed(2),
+                        rotZ: +(torahMesh ? torahMesh.rotation.z : TORAH_CONFIG.rotZ).toFixed(2),
+                        scale: +(TORAH_CONFIG.scale.toFixed(1)),
+                        scaleW: +(TORAH_CONFIG.scaleW.toFixed(2)),
+                        scaleH: +(TORAH_CONFIG.scaleH.toFixed(2)),
+                        diagonalSpin: {
+                            speed: +(TORAH_CONFIG.diagonalSpin.speed.toFixed(2)),
+                            axisX: TORAH_CONFIG.diagonalSpin.axisX,
+                            axisY: TORAH_CONFIG.diagonalSpin.axisY,
+                            axisZ: TORAH_CONFIG.diagonalSpin.axisZ,
+                        },
+                    },
+                    LOGO_CONFIG: {
+                        objectKey: LOGO_CONFIG.objectKey,
+                        y: +(LOGO_CONFIG.y.toFixed(1)),
+                        rotX: +(LOGO_CONFIG.rotX.toFixed(2)),
+                        rotZ: +(LOGO_CONFIG.rotZ.toFixed(2)),
+                        scale: +(LOGO_CONFIG.scale.toFixed(1)),
+                        orbitSpeed: +(LOGO_CONFIG.orbitSpeed.toFixed(2)),
+                        orbitRadius: +(LOGO_CONFIG.orbitRadius.toFixed(0)),
+                    },
+                    ENTER_BUTTON_CONFIG: {
+                        orbitSpeed: +(ENTER_BUTTON_CONFIG.orbitSpeed.toFixed(2)),
+                        orbitRadius: +(ENTER_BUTTON_CONFIG.orbitRadius.toFixed(0)),
+                        buttonConfig: JSON.parse(JSON.stringify(btnCfg)),
+                    },
+                    CAMERA_CONFIG: {
+                        fov: Math.round(camera.fov),
+                        minDistance: Math.round(controls.minDistance),
+                        maxDistance: Math.round(controls.maxDistance),
+                        height: +(camera.position.y.toFixed(1)),
+                        targetX: +(controls.target.x.toFixed(1)),
+                        targetY: +(controls.target.y.toFixed(1)),
+                        targetZ: +(controls.target.z.toFixed(1)),
+                        autoRotateSpeed: +(controls.autoRotateSpeed.toFixed(2)),
+                    },
+                    SUN_CONFIG: {
+                        distance: +(SUN_CONFIG.distance.toFixed(1)),
+                        elevation: +(SUN_CONFIG.elevation.toFixed(2)),
+                        azimuth: +(SUN_CONFIG.azimuth.toFixed(2)),
+                        intensity: +(SUN_CONFIG.intensity.toFixed(1)),
+                        radius: +(SUN_CONFIG.radius.toFixed(1)),
+                        glowScale: +(SUN_CONFIG.glowScale.toFixed(1)),
+                        color: SUN_CONFIG.color,
+                        glowColor: SUN_CONFIG.glowColor,
+                    },
+                    BLOOM_CONFIG: {
+                        strength: +(bloomPass ? bloomPass.strength : BLOOM_CONFIG.strength).toFixed(2),
+                        threshold: +(bloomPass ? bloomPass.threshold : BLOOM_CONFIG.threshold).toFixed(2),
+                        radius: +(bloomPass ? bloomPass.radius : BLOOM_CONFIG.radius).toFixed(2),
+                    },
+                    LIGHTING: {
+                        ambient: +((ambientLight ? ambientLight.intensity : 0.3).toFixed(2)),
+                        directional: +((directionalLight ? directionalLight.intensity : 0.5).toFixed(2)),
+                    },
+                };
+                navigator.clipboard.writeText(JSON.stringify(config, null, 2)).then(() => {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => { copyBtn.textContent = 'Copy Config to Clipboard'; }, 2000);
+                });
+            });
+            panel.appendChild(copyBtn);
+        }
+
+        // ============ START ============
+        init();
+        setupTuningPanel();
+    </script>
+</body>
+</html>

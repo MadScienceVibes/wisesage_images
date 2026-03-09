@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House of Light - BeitOhr</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        canvas { display: block; }
+
+        /* Loading overlay */
+        #loading-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: radial-gradient(ellipse at center, #1a1020 0%, #0a0510 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        #loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+        #loading-title {
+            font-size: 2.5rem; color: #f5d78e; font-weight: 300;
+            letter-spacing: 0.3em; margin-bottom: 1.5rem;
+            text-shadow: 0 0 30px rgba(245, 215, 142, 0.4);
+        }
+        #loading-bar-outer {
+            width: 300px; height: 4px; background: rgba(255,255,255,0.1);
+            border-radius: 2px; overflow: hidden;
+        }
+        #loading-bar-inner {
+            width: 0%; height: 100%; background: linear-gradient(90deg, #f5d78e, #e8a94e);
+            border-radius: 2px; transition: width 0.3s ease;
+        }
+        #loading-status {
+            color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 0.8rem;
+            letter-spacing: 0.1em;
+        }
+
+        /* Warm dark glass theme for dropdowns */
+        .hol-select {
+            position: fixed; z-index: 10;
+            appearance: none; -webkit-appearance: none;
+            background: rgba(20, 12, 8, 0.75);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(245, 215, 142, 0.25);
+            border-radius: 8px; padding: 10px 36px 10px 14px;
+            color: #f5d78e; font-size: 0.9rem; font-family: inherit;
+            cursor: pointer; min-width: 200px;
+            outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f5d78e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        .hol-select:hover { border-color: rgba(245, 215, 142, 0.5); box-shadow: 0 0 20px rgba(245, 215, 142, 0.1); }
+        .hol-select:focus { border-color: rgba(245, 215, 142, 0.6); box-shadow: 0 0 25px rgba(245, 215, 142, 0.15); }
+        .hol-select option { background: #1a0f08; color: #f5d78e; padding: 6px; }
+
+        .select-label {
+            position: fixed; z-index: 10;
+            color: rgba(245, 215, 142, 0.5); font-size: 0.65rem;
+            letter-spacing: 0.15em; text-transform: uppercase;
+        }
+
+        #character-select { left: 20%; top: 50%; transform: translateY(-50%); }
+        #character-label { left: 20%; top: calc(50% - 26px); transform: translateY(-50%); }
+
+        #background-select { right: 20%; top: 50%; transform: translateY(-50%); }
+        #background-label { right: 20%; top: calc(50% - 26px); transform: translateY(-50%); text-align: right; }
+
+        /* Enter button hitbox — invisible overlay, tracks 3D button screen position */
+        #enter-hitbox {
+            position: fixed; z-index: 10;
+            cursor: pointer; pointer-events: auto;
+            width: 260px; height: 90px;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading screen -->
+    <div id="loading-overlay">
+        <div id="loading-title">BEITOHR</div>
+        <div id="loading-bar-outer"><div id="loading-bar-inner"></div></div>
+        <div id="loading-status">Initializing...</div>
+    </div>
+
+    <!-- Character select (left) -->
+    <span id="character-label" class="select-label">Choose Your Guide</span>
+    <select id="character-select" class="hol-select">
+        <option value="">Select Character...</option>
+        <optgroup label="Sages">
+            <option value="moshe_rabbeinu">Moshe Rabbeinu</option>
+<option value="alter_rebbe">Alter Rebbe</option>
+            <option value="baal_shem_tov">Baal Shem Tov</option>
+            <option value="maimonides">Maimonides (Rambam)</option>
+            <option value="rashbi">Rashbi</option>
+            <option value="rabbi_akiva">Rabbi Akiva</option>
+            <option value="king_david">King David</option>
+            <option value="rashi">Rashi</option>
+            <option value="ramban">Ramban</option>
+            <option value="ramchal">Ramchal</option>
+            <option value="maharal">Maharal</option>
+        </optgroup>
+        <optgroup label="Matriarchs">
+            <option value="sarah_imeinu">Sarah Imeinu</option>
+            <option value="rivkah_imeinu">Rivkah Imeinu</option>
+            <option value="rachel_imeinu">Rachel Imeinu</option>
+            <option value="leah_imeinu">Leah Imeinu</option>
+            <option value="miriam_haneviah">Miriam HaNeviah</option>
+        </optgroup>
+    </select>
+
+    <!-- Background select (right) -->
+    <span id="background-label" class="select-label">Choose Background</span>
+    <select id="background-select" class="hol-select">
+        <option value="">Select Background...</option>
+        <option value="mount_sinai">Mount Sinai</option>
+        <option value="synagogue">Synagogue</option>
+        <option value="forest">Forest</option>
+        <option value="egypt">Egypt</option>
+        <option value="cave">Cave</option>
+        <option value="ancient_city">Ancient City</option>
+        <option value="desert_tents">Desert Tents</option>
+        <option value="jerusalem">Jerusalem</option>
+        <option value="beach">Beach</option>
+        <option value="western_wall">Western Wall</option>
+        <option value="study_benches">Study Benches</option>
+        <option value="library">Library</option>
+        <option value="grand_library">Grand Library</option>
+        <option value="city_square">City Square (Night)</option>
+        <option value="pyramids">Pyramids</option>
+        <option value="sky">Open Sky</option>
+        <option value="shacharit">Jerusalem Sunrise</option>
+        <option value="mincha">Synagogue (Day)</option>
+        <option value="maariv">Old City Evening</option>
+        <option value="benching">Kitchen</option>
+        <option value="karaoke">Concert Hall</option>
+        <option value="stories">Courtyard Firepit</option>
+    </select>
+
+    <!-- Enter button hitbox (positioned by JS each frame) -->
+    <div id="enter-hitbox"></div>
+
+    <div id="canvas-container"></div>
+
+    <!-- Three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // ============ CONFIGURATION ============
+
+        // All BeitOhr character models (viseme GLBs)
+        const CHARACTER_MODELS = {
+            moshe_rabbeinu: '../../WS/BeitOhrAssets/models/finished/moshe_viseme.glb',
+alter_rebbe: '../../WS/BeitOhrAssets/models/finished/alter_rebbe_viseme.glb',
+            baal_shem_tov: '../../WS/BeitOhrAssets/models/finished/baal_shem_tov_viseme.glb',
+            maimonides: '../../WS/BeitOhrAssets/models/finished/maimonides_viseme.glb',
+            rashbi: '../../WS/BeitOhrAssets/models/finished/rashbi_viseme.glb',
+            rabbi_akiva: '../../WS/BeitOhrAssets/models/finished/rabbi_akiva_viseme.glb',
+            king_david: '../../WS/BeitOhrAssets/models/finished/king_david_viseme.glb',
+            rashi: '../../WS/BeitOhrAssets/models/finished/rashi_viseme.glb',
+            ramban: '../../WS/BeitOhrAssets/models/finished/ramban_viseme.glb',
+            ramchal: '../../WS/BeitOhrAssets/models/finished/ramchal_viseme.glb',
+            maharal: '../../WS/BeitOhrAssets/models/finished/maharal_viseme.glb',
+            sarah_imeinu: '../../WS/BeitOhrAssets/models/finished/sarah_viseme.glb',
+            rivkah_imeinu: '../../WS/BeitOhrAssets/models/finished/rivkah_viseme.glb',
+            rachel_imeinu: '../../WS/BeitOhrAssets/models/finished/rachel_viseme.glb',
+            leah_imeinu: '../../WS/BeitOhrAssets/models/finished/leah_viseme.glb',
+            miriam_haneviah: '../../WS/BeitOhrAssets/models/finished/miriam_viseme.glb',
+        };
+
+        // Scene objects (logo, shields, house_of_light)
+        const SCENE_OBJECTS = {
+            bo_logo_v4: '../../WS/BeitOhrAssets/models/Meshy_AI_logo_0222023915_texture.glb',
+            bo_david_star_shield: '../../WS/BeitOhrAssets/models/Meshy_AI_David_Star_Shield_0220192652_texture.glb',
+            bo_house_of_light: '../../WS/BeitOhrAssets/models/Meshy_AI_House_of_Light_0222013802_texture.glb',
+            bo_torah: '../../WS/BeitOhrAssets/models/torah.glb',
+        };
+
+        // Panorama paths
+        const PANORAMAS = {
+            space: '../panoramas/space.jpg',
+            space_sun: '../panoramas/space_sun.jpg',
+            bo_mount_sinai: '../panoramas/mount_sinai.jpg',
+            bo_synagogue: '../panoramas/synagogue.jpg',
+            bo_forest: '../panoramas/forest.jpg',
+            bo_egypt: '../panoramas/egypt_360.jpg',
+            bo_cave: '../panoramas/cave_1_360.jpg',
+            bo_ancient_city: '../panoramas/ancient_city_360.jpg',
+            bo_desert_tents: '../panoramas/desert_tents.jpg',
+            bo_jerusalem: '../panoramas/jerusalem.jpg',
+            bo_beach: '../panoramas/beach.jpg',
+            bo_western_wall: '../panoramas/western_wall_360.jpg',
+            bo_study_benches: '../panoramas/study_benches_360.jpg',
+            bo_library: '../panoramas/library_2.jpg',
+            bo_grand_library: '../panoramas/library_3.jpg',
+            bo_city_square_night: '../panoramas/city_square_night.jpg',
+            bo_pyramids: '../panoramas/pyramids.jpg',
+            bo_sky: '../panoramas/sky_360.jpg',
+            bo_colosseum: '../panoramas/Coleseum_360_.jpg',
+            bo_shacharit: '../panoramas/jerusalem_sunrise.jpg',
+            bo_mincha: '../panoramas/synagogue_day.jpg',
+            bo_maariv: '../panoramas/old_city_evening.jpg',
+            bo_benching: '../panoramas/kitchen.jpg',
+            bo_karaoke: '../panoramas/concert_hall.jpg',
+            bo_stories: '../panoramas/courtyard_firepit.jpg',
+        };
+
+        // Scene layout from house_of_light_scene.json
+        const SCENE_CHARACTERS = [
+            { modelKey: 'rivkah_imeinu', x: 66.8, y: 16.9, z: 5.5, rotX: 0, rotY: 1.59, rotZ: 0, scale: 22.5 },
+            { modelKey: 'miriam_haneviah', x: 57.7, y: 19.1, z: 28.2, rotX: 0, rotY: 0.92, rotZ: 0, scale: 24.5 },
+            { modelKey: 'alter_rebbe', x: -46.6, y: 14.6, z: 82.7, rotX: 0, rotY: -0.31, rotZ: 0, scale: 18.5 },
+            { modelKey: 'maimonides', x: -110.1, y: 0, z: -4.9, rotX: -0.07, rotY: -3.14, rotZ: 0, scale: 12 },
+            { modelKey: 'moshe_rabbeinu', x: -30.8, y: 16.9, z: 84.9, rotX: -0.03, rotY: 0, rotZ: -0.12, scale: 21.5 },
+            { modelKey: 'baal_shem_tov', x: -37.6, y: 16.9, z: -89.7, rotX: 0.02, rotY: -2.07, rotZ: -0.03, scale: 26 },
+            { modelKey: 'king_david', x: -10.3, y: 22.2, z: -89.7, rotX: -0.07, rotY: 2.4, rotZ: 0.21, scale: 33 },
+            { modelKey: 'rachel_imeinu', x: -110.1, y: 3.3, z: 5.5, rotX: 0, rotY: -2.07, rotZ: 0, scale: 9.5 },
+        ];
+
+        const SCENE_OBJECTS_LAYOUT = [
+            { objectKey: 'bo_logo_v4', x: -33, y: 78.1, z: 71.3, rotX: 0, rotY: 0, rotZ: 0, scale: 44, spin: 0.12 },
+            { objectKey: 'bo_david_star_shield', x: 66.8, y: -8.1, z: 19.1, rotX: -1.55, rotY: 0.02, rotZ: 1.35, scale: 28.5 },
+            { objectKey: 'bo_david_star_shield', x: -119.2, y: -3.5, z: 1.0, rotX: -1.59, rotY: 0.59, rotZ: -1.64, scale: 19.5 },
+            { objectKey: 'bo_house_of_light', x: -28.5, y: 23.7, z: 10.1, rotX: -0.03, rotY: -0.12, rotZ: -0.05, scale: 107.5 },
+            { objectKey: 'bo_david_star_shield', x: -26.2, y: -12.6, z: -96.6, rotX: -1.4, rotY: 0.07, rotZ: -3.11, scale: 32 },
+            { objectKey: 'bo_david_star_shield', x: -39.8, y: -8.1, z: 84.9, rotX: -1.59, rotY: 0.02, rotZ: -0.22, scale: 25.5 },
+            { objectKey: 'bo_torah', x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 20 },
+        ];
+
+        const SUN_CONFIG = {
+            distance: 32, elevation: 0, azimuth: -1.36, intensity: 23.7,
+            radius: 12, glowScale: 27.9, color: '#ffddaa', glowColor: '#fff0c8'
+        };
+
+        const BLOOM_CONFIG = { strength: 1.5, threshold: 0.8, radius: 0.4 };
+        const CAMERA_CONFIG = { fov: 144, minDistance: 50, maxDistance: 145, height: 35.2, targetY: 12.0 };
+        const SPHERE_RADIUS = 150;
+
+        // ============ GLOBALS ============
+        let scene, camera, renderer, controls, composer, bloomPass;
+        let panoramaSphere, panoramaMaterial;
+        let enterButton3D, enterButtonMaterial;
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let isHoveringEnter = false;
+        let characterMeshes = {}; // modelKey -> THREE.Group
+        let spinningObjects = []; // { mesh, speed }
+        let loadedCount = 0;
+        const totalToLoad = SCENE_CHARACTERS.length + SCENE_OBJECTS_LAYOUT.length + 1; // +1 for panorama
+
+        const textureLoader = new THREE.TextureLoader();
+        const gltfLoader = new GLTFLoader();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+        gltfLoader.setDRACOLoader(dracoLoader);
+
+        // ============ LOADING ============
+        function updateLoading(label) {
+            loadedCount++;
+            const pct = Math.min(100, Math.round((loadedCount / totalToLoad) * 100));
+            document.getElementById('loading-bar-inner').style.width = pct + '%';
+            document.getElementById('loading-status').textContent = label;
+            if (loadedCount >= totalToLoad) {
+                animate();
+                setTimeout(() => {
+                    const overlay = document.getElementById('loading-overlay');
+                    overlay.classList.add('fade-out');
+                    setTimeout(() => overlay.style.display = 'none', 800);
+                }, 400);
+            }
+        }
+
+        // ============ INIT ============
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(CAMERA_CONFIG.fov, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.set(0, CAMERA_CONFIG.height, 120);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            container.appendChild(renderer.domElement);
+
+            // Environment map for PBR materials
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+            pmremGenerator.dispose();
+
+            // Controls — auto-rotate
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = CAMERA_CONFIG.minDistance;
+            controls.maxDistance = CAMERA_CONFIG.maxDistance;
+            controls.target.set(0, CAMERA_CONFIG.targetY, 0);
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.3;
+            controls.minPolarAngle = 0;
+            controls.maxPolarAngle = 1.6;
+            controls.update();
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambient);
+            const dir = new THREE.DirectionalLight(0xffffff, 0.5);
+            dir.position.set(5, 10, 7.5);
+            scene.add(dir);
+
+            // Bloom post-processing
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                BLOOM_CONFIG.strength, BLOOM_CONFIG.radius, BLOOM_CONFIG.threshold
+            );
+            composer.addPass(bloomPass);
+
+            // Build scene
+            createPanoramaSphere('space');
+            createSun();
+            loadSceneCharacters();
+            loadSceneObjects();
+            createEnterButton();
+
+            // Events
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            document.getElementById('enter-hitbox').addEventListener('click', onEnterClick);
+            document.getElementById('enter-hitbox').addEventListener('mouseenter', () => { isHoveringEnter = true; });
+            document.getElementById('enter-hitbox').addEventListener('mouseleave', () => { isHoveringEnter = false; });
+
+        }
+
+        // ============ PANORAMA SPHERE ============
+        function createPanoramaSphere(panoKey) {
+            const path = PANORAMAS[panoKey];
+            const geo = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 32);
+            geo.scale(-1, 1, 1); // invert for inside view
+            panoramaMaterial = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+            panoramaSphere = new THREE.Mesh(geo, panoramaMaterial);
+            scene.add(panoramaSphere);
+
+            textureLoader.load(path, (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                panoramaMaterial.map = tex;
+                panoramaMaterial.needsUpdate = true;
+                updateLoading('Panorama loaded');
+            });
+        }
+
+        // ============ SUN ============
+        function createSun() {
+            const sunGroup = new THREE.Group();
+            sunGroup.name = 'sunGroup';
+
+            // Emissive core sphere
+            const geo = new THREE.SphereGeometry(SUN_CONFIG.radius, 32, 32);
+            const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SUN_CONFIG.color) });
+            sunGroup.add(new THREE.Mesh(geo, mat));
+
+            // Glow sprite (canvas-generated)
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const c = new THREE.Color(SUN_CONFIG.glowColor);
+            const r = Math.round(c.r * 255), g = Math.round(c.g * 255), b = Math.round(c.b * 255);
+            const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+            grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1.0)`);
+            grad.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, 0.6)`);
+            grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.2)`);
+            grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.0)`);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 256, 256);
+            const spriteTex = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({
+                map: spriteTex, blending: THREE.AdditiveBlending,
+                transparent: true, depthWrite: false
+            });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(SUN_CONFIG.radius * SUN_CONFIG.glowScale, SUN_CONFIG.radius * SUN_CONFIG.glowScale, 1);
+            sunGroup.add(sprite);
+
+            // Point light
+            const light = new THREE.PointLight(new THREE.Color(SUN_CONFIG.color), SUN_CONFIG.intensity, 0, 1);
+            sunGroup.add(light);
+
+            // Position from spherical
+            const phi = (Math.PI / 2) - SUN_CONFIG.elevation;
+            const sph = new THREE.Spherical(SUN_CONFIG.distance, phi, SUN_CONFIG.azimuth);
+            sunGroup.position.setFromSpherical(sph);
+
+            scene.add(sunGroup);
+        }
+
+        // ============ LOAD CHARACTERS ============
+        function loadSceneCharacters() {
+            for (const charDef of SCENE_CHARACTERS) {
+                const path = CHARACTER_MODELS[charDef.modelKey];
+                gltfLoader.load(path, (gltf) => {
+                    const model = gltf.scene;
+                    model.position.set(charDef.x, charDef.y, charDef.z);
+                    model.rotation.set(charDef.rotX, charDef.rotY, charDef.rotZ);
+                    model.scale.setScalar(charDef.scale);
+                    model.userData.characterKey = charDef.modelKey;
+                    scene.add(model);
+                    characterMeshes[charDef.modelKey] = model;
+                    updateLoading(`Loaded ${charDef.modelKey}`);
+                }, undefined, (err) => {
+                    console.warn(`Failed to load ${charDef.modelKey}:`, err);
+                    updateLoading(`Failed: ${charDef.modelKey}`);
+                });
+            }
+        }
+
+        // ============ LOAD SCENE OBJECTS ============
+        function loadSceneObjects() {
+            // Cache loaded GLBs to avoid re-downloading the same model
+            const objectCache = {};
+
+            for (const objDef of SCENE_OBJECTS_LAYOUT) {
+                const path = SCENE_OBJECTS[objDef.objectKey];
+                const place = (gltf) => {
+                    const model = gltf.scene.clone();
+                    model.position.set(objDef.x, objDef.y, objDef.z);
+                    model.rotation.set(objDef.rotX, objDef.rotY, objDef.rotZ);
+                    model.scale.setScalar(objDef.scale);
+                    scene.add(model);
+                    if (objDef.spin) {
+                        spinningObjects.push({ mesh: model, speed: objDef.spin });
+                    }
+                    updateLoading(`Loaded ${objDef.objectKey}`);
+                };
+
+                if (objectCache[objDef.objectKey]) {
+                    place(objectCache[objDef.objectKey]);
+                } else {
+                    gltfLoader.load(path, (gltf) => {
+                        objectCache[objDef.objectKey] = gltf;
+                        place(gltf);
+                    }, undefined, (err) => {
+                        console.warn(`Failed to load ${objDef.objectKey}:`, err);
+                        updateLoading(`Failed: ${objDef.objectKey}`);
+                    });
+                }
+            }
+        }
+
+        // ============ 3D ENTER BUTTON ============
+        let enterButtonLocked = true;
+        let enterTexLocked, enterTexUnlocked;
+        let enterButtonGroup; // THREE.Group holding face + rim
+
+        function drawRoundedRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        function buildButtonTexture(locked) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // Background fill
+            ctx.fillStyle = locked ? 'rgba(15, 10, 5, 0.7)' : 'rgba(35, 22, 12, 0.95)';
+            drawRoundedRect(ctx, 0, 0, 512, 256, 20);
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = locked ? 'rgba(245, 215, 142, 0.2)' : '#f5d78e';
+            ctx.lineWidth = locked ? 3 : 5;
+            drawRoundedRect(ctx, 4, 4, 504, 248, 18);
+            ctx.stroke();
+
+            // Inner highlight line (top edge glow for 3D feel)
+            if (!locked) {
+                ctx.strokeStyle = 'rgba(255, 240, 200, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(24, 12);
+                ctx.lineTo(488, 12);
+                ctx.stroke();
+            }
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (locked) {
+                // -- Lock icon --
+                const cx = 256, cy = 85;
+                // Shackle (arc)
+                ctx.strokeStyle = 'rgba(245, 215, 142, 0.3)';
+                ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.arc(cx, cy - 10, 24, Math.PI, 0);
+                ctx.stroke();
+                // Body (rectangle)
+                ctx.fillStyle = 'rgba(245, 215, 142, 0.3)';
+                ctx.fillRect(cx - 30, cy + 2, 60, 42);
+                // Keyhole circle
+                ctx.fillStyle = 'rgba(15, 10, 5, 0.9)';
+                ctx.beginPath();
+                ctx.arc(cx, cy + 18, 8, 0, Math.PI * 2);
+                ctx.fill();
+                // Keyhole slot
+                ctx.fillRect(cx - 3, cy + 24, 6, 14);
+
+                // Text
+                ctx.fillStyle = 'rgba(245, 215, 142, 0.25)';
+                ctx.font = 'bold 32px Segoe UI, Tahoma, sans-serif';
+                ctx.fillText('SELECT TO ENTER', 256, 190);
+            } else {
+                // -- Click/pointer icon --
+                const cx = 256, cy = 75;
+                ctx.fillStyle = '#f5d78e';
+                ctx.shadowColor = '#e8a94e';
+                ctx.shadowBlur = 20;
+                // Index finger (tall rectangle with rounded top)
+                ctx.beginPath();
+                ctx.moveTo(cx - 7, cy + 15);
+                ctx.lineTo(cx - 7, cy - 25);
+                ctx.quadraticCurveTo(cx - 7, cy - 35, cx, cy - 35);
+                ctx.quadraticCurveTo(cx + 7, cy - 35, cx + 7, cy - 25);
+                ctx.lineTo(cx + 7, cy + 15);
+                ctx.closePath();
+                ctx.fill();
+                // Palm base
+                ctx.beginPath();
+                ctx.moveTo(cx - 25, cy + 15);
+                ctx.lineTo(cx + 25, cy + 15);
+                ctx.quadraticCurveTo(cx + 30, cy + 15, cx + 30, cy + 22);
+                ctx.lineTo(cx + 30, cy + 42);
+                ctx.quadraticCurveTo(cx + 30, cy + 50, cx + 22, cy + 50);
+                ctx.lineTo(cx - 22, cy + 50);
+                ctx.quadraticCurveTo(cx - 30, cy + 50, cx - 30, cy + 42);
+                ctx.lineTo(cx - 30, cy + 22);
+                ctx.quadraticCurveTo(cx - 30, cy + 15, cx - 25, cy + 15);
+                ctx.closePath();
+                ctx.fill();
+                // Click lines (radiating from fingertip)
+                ctx.strokeStyle = '#f5d78e';
+                ctx.lineWidth = 3;
+                for (const a of [-0.6, -0.3, 0, 0.3, 0.6]) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + Math.sin(a) * 18, cy - 35 + Math.cos(a) * -8);
+                    ctx.lineTo(cx + Math.sin(a) * 28, cy - 35 + Math.cos(a) * -18);
+                    ctx.stroke();
+                }
+                ctx.shadowBlur = 0;
+
+                // ENTER text with glow
+                ctx.shadowColor = '#e8a94e';
+                ctx.shadowBlur = 30;
+                ctx.fillStyle = '#f5d78e';
+                ctx.font = 'bold 52px Segoe UI, Tahoma, sans-serif';
+                ctx.fillText('ENTER', 256, 185);
+                ctx.fillText('ENTER', 256, 185);
+            }
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function updateEnterButtonLock() {
+            const charVal = document.getElementById('character-select').value;
+            const bgVal = document.getElementById('background-select').value;
+            enterButtonLocked = !charVal || !bgVal;
+            if (!enterButtonGroup) return;
+            const faceMat = enterButtonGroup.children[0].material;
+            faceMat.map = enterButtonLocked ? enterTexLocked : enterTexUnlocked;
+            faceMat.opacity = enterButtonLocked ? 0.4 : 1.0;
+            faceMat.emissiveIntensity = enterButtonLocked ? 0.0 : 0.5;
+            faceMat.needsUpdate = true;
+            // Rim color
+            enterButtonGroup.children[1].material.opacity = enterButtonLocked ? 0.3 : 0.9;
+            enterButtonGroup.children[1].material.emissiveIntensity = enterButtonLocked ? 0.0 : 0.3;
+        }
+
+        function createEnterButton() {
+            enterButtonGroup = new THREE.Group();
+
+            // --- FACE (front panel with texture) ---
+            const w = 90, h = 45;
+            const faceGeo = new THREE.PlaneGeometry(w, h);
+            enterTexLocked = buildButtonTexture(true);
+            enterTexUnlocked = buildButtonTexture(false);
+
+            const faceMat = new THREE.MeshBasicMaterial({
+                map: enterTexLocked,
+                transparent: true,
+                side: THREE.DoubleSide,
+                opacity: 0.4,
+            });
+            const faceMesh = new THREE.Mesh(faceGeo, faceMat);
+            faceMesh.position.z = 5.1; // slightly in front of rim
+            enterButtonGroup.add(faceMesh);
+
+            // --- RIM (extruded box behind the face for 3D depth) ---
+            const rimW = 94, rimH = 49, rimD = 12;
+            const rimGeo = new THREE.BoxGeometry(rimW, rimH, rimD, 1, 1, 1);
+            const rimMat = new THREE.MeshBasicMaterial({
+                color: 0x8a6520,
+                transparent: true,
+                opacity: 0.3,
+            });
+            const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+            enterButtonGroup.add(rimMesh);
+
+            // --- EDGE HIGHLIGHTS (wireframe for visible 3D edges) ---
+            const edgeGeo = new THREE.EdgesGeometry(rimGeo);
+            const edgeMat = new THREE.LineBasicMaterial({
+                color: 0xf5d78e,
+                transparent: true,
+                opacity: 0.5,
+            });
+            const edgeMesh = new THREE.LineSegments(edgeGeo, edgeMat);
+            enterButtonGroup.add(edgeMesh);
+
+            enterButtonGroup.position.set(-28.5, -105, 10.1);
+            enterButtonGroup.renderOrder = 999;
+            enterButtonGroup.name = 'enterButton';
+            scene.add(enterButtonGroup);
+
+            // Assign to enterButton3D for animation loop compatibility
+            enterButton3D = enterButtonGroup;
+
+            document.getElementById('character-select').addEventListener('change', updateEnterButtonLock);
+            document.getElementById('background-select').addEventListener('change', updateEnterButtonLock);
+        }
+
+        // ============ EVENT HANDLERS ============
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(e) {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onEnterClick() {
+            const charSelect = document.getElementById('character-select');
+            const bgSelect = document.getElementById('background-select');
+            const character = charSelect.value;
+            const background = bgSelect.value;
+            if (!character || !background) return; // both required
+            // APP_URL: set this to the production domain when deployed
+            const APP_URL = 'http://localhost:3000'; // TODO: replace with production URL on Railway
+            const url = `${APP_URL}?character=${encodeURIComponent(character)}&background=${encodeURIComponent(background)}`;
+            window.location = url;
+        }
+
+        // ============ ANIMATION LOOP ============
+        const clock = new THREE.Clock();
+        let enterButtonBaseY = -105;
+        let enterFloatPhase = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            // Update orbit controls
+            controls.update();
+
+            // Orbit logo around the house_of_light
+            const houseCenter = { x: -28.5, y: 23.7, z: 10.1 };
+            const logoOrbitRadius = 55;
+            const logoOrbitHeight = 78.1; // original Y
+            for (const { mesh, speed } of spinningObjects) {
+                const angle = elapsed * speed;
+                mesh.position.x = houseCenter.x + Math.cos(angle) * logoOrbitRadius;
+                mesh.position.z = houseCenter.z + Math.sin(angle) * logoOrbitRadius;
+                mesh.position.y = logoOrbitHeight + Math.sin(elapsed * 0.3) * 3;
+                // Fixed forward-facing — never rotates, always reads left to right
+                mesh.rotation.set(0, 0, 0);
+            }
+
+            // Gentle float on characters
+            for (const charDef of SCENE_CHARACTERS) {
+                const mesh = characterMeshes[charDef.modelKey];
+                mesh.position.y = charDef.y + Math.sin(elapsed * 0.5 + charDef.x * 0.1) * 1.5;
+            }
+
+            // Enter button float animation
+            enterFloatPhase += dt;
+            enterButton3D.position.y = enterButtonBaseY + Math.sin(enterFloatPhase * 1.2) * 2;
+            // Face camera — Y rotation only, no tilt
+            enterButton3D.lookAt(camera.position);
+            enterButton3D.rotation.x = 0;
+            enterButton3D.rotation.z = 0;
+
+            // Enter button hover — scale pulse
+            const targetScale = isHoveringEnter ? 1.15 : 1.0;
+            const s = enterButton3D.scale.x + (targetScale - enterButton3D.scale.x) * 0.1;
+            enterButton3D.scale.set(s, s, s);
+
+            // Project enter button to screen for hitbox positioning
+            const btnScreenPos = enterButton3D.position.clone().project(camera);
+            const hitbox = document.getElementById('enter-hitbox');
+            hitbox.style.left = (btnScreenPos.x * 0.5 + 0.5) * window.innerWidth + 'px';
+            hitbox.style.top = (-btnScreenPos.y * 0.5 + 0.5) * window.innerHeight + 'px';
+            hitbox.style.cursor = enterButtonLocked ? 'not-allowed' : 'pointer';
+            hitbox.style.pointerEvents = enterButtonLocked ? 'none' : 'auto';
+
+            // Render with bloom
+            composer.render();
+        }
+
+        // ============ START ============
+        init();
+    </script>
+</body>
+</html>
